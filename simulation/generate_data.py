@@ -76,7 +76,7 @@ FULL_W = [1.30, 1.00, 0.92, 0.98]      # weekly shape of a coupon
 DIPW = [0.52, 0.29, 0.19]             # weekly shape of the dip
 FR_COUPON = {2025: {43: 0.890, 44: 0.935, 45: 0.962, 46: 0.972, 47: 0.970, 48: 0.990, 49: 0.987, 50: 0.984}}
 SD_MARKET, SD_BRAND, SD_DAY = 0.025, 0.015, 0.02
-CASE, PALLET = 6, 1200
+CASE, ORDER_LOT = 6, 1200  # store orders in cases of 6, distribution centre orders in lots of 1,200 units
 
 
 def price(b, y, w):
@@ -249,14 +249,14 @@ def simulate(seed: int, inp: Inputs) -> dict:
         fc = ALPHA_S * dmd[w] + (1 - ALPHA_S) * fc
         so[w] = o_prev = max(0, round_to(fc * (1 + DELTA_S) - ns, CASE))
     fD = so[1]
-    nsD, O0 = DELTA_D * fD, ceil_to(fD, PALLET)
+    nsD, O0 = DELTA_D * fD, ceil_to(fD, ORDER_LOT)
     hist, wip, dc = {-1: O0, 0: O0}, O0, {}
     for w in WEEKS:  # distribution centre orders with one week of transport
         r = hist[w - 2]
         nsD = nsD + r - so[w]
         wip = wip + hist[w - 1] - r
         fD = ALPHA_D * so[w] + (1 - ALPHA_D) * fD
-        dc[w] = hist[w] = max(0, ceil_to((1 + DELTA_D + TP_D) * fD - (nsD + wip), PALLET))
+        dc[w] = hist[w] = max(0, ceil_to((1 + DELTA_D + TP_D) * fD - (nsD + wip), ORDER_LOT))
 
     weekly_rows, hourly_rows = [], []
     for (y, w) in keep:
