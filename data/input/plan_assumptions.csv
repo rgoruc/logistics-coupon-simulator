@@ -1,6 +1,6 @@
 parameter,value,note
 plan_year,2026,Year of the planned coupon
-start_week,1,First coupon week (Monday): 1 to 49 for a 4-week coupon or 1 to 51 for a 2-week coupon (weeks up to 42 are a what-if on the 2026 data)
+start_week,48,First coupon week (Monday): 1 to 49 for a 4-week coupon or 1 to 51 for a 2-week coupon (weeks up to 42 are a what-if on the 2026 data)
 full_weeks,4,Coupon length in weeks: 2 or 4 (Monday to Saturday)
 discount,0.20,Coupon discount: 0.10 or 0.20 or 0.30 (0.20 = 20% off)
 app_users,260000,Monthly active male app users who can get the coupon

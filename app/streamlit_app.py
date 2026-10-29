@@ -248,9 +248,6 @@ ASSUMPTIONS = [
         + f"; {depth} units per facing; a normal week sells " + " / ".join(f"{x.normal_week:g}" for x in data.shelf) + " units.",
     ]),
 ]
-with st.expander("Assumptions"):
-    st.markdown("\n\n".join(
-        f"**{title}**\n" + "\n".join(f"- {t}" for t in items) for title, items in ASSUMPTIONS))
 end = max(s["weeks"])
 end_date = iso_monday(py, end) + dt.timedelta(days=5)
 st.markdown(f"**{NAME} · {discount}% off · week {start} to {end}** · {ddmmm(s['startDate'])} to {ddmmm(end_date, True)}")
@@ -264,9 +261,10 @@ k1.caption(f"units of normal demand · {pal_base} pallets")
 # shown rounded to 100: "with" = rounded "without" + rounded extra, so the three tiles add up
 with_disp = js_round(s["couponBaseline"] / 100) * 100 + js_round(s["incremental"] / 100) * 100
 k2.metric("With the coupon", h100(with_disp))
-k2.caption(f"{h100(s['redemptions'])} redemptions · {h100(s['couponUnits'])} units sold with it")
+k2.caption("units of demand with the coupon")
 k3.metric("Extra units from the coupon", s100(s["incremental"]))
-k3.caption(f"{pal_with - pal_base:+d} pallets · {s100(s['net'])} net after the dip")
+k3.caption(f"{js_round(s['incremental'] / s['couponUnits'] * 100)}% of the {h100(s['couponUnits'])} units bought with the coupon · "
+           f"{s100(s['net'])} net after the dip")
 k4.metric(f"Commit by {ddmmm(due, True)}", h100(C["q"]))
 k4.caption(f"units for a {fill}% fill rate · " + ("no buffer needed" if abs(C["buffer"]) < 50 else f"{s100(C['buffer'])} buffer on the forecast"))
 if ready:
@@ -661,3 +659,9 @@ with tab_m:
         "week's shock is shared by its six days. The counterfactual of the weeks the drivers never saw missed actual weekly "
         "demand by 3.8% on average, with a bias of +0.9%.",
     ]))
+
+# ---------------- assumptions, at the end ----------------
+st.divider()
+with st.expander("Assumptions"):
+    st.markdown("\n\n".join(
+        f"**{title}**\n" + "\n".join(f"- {t}" for t in items) for title, items in ASSUMPTIONS))

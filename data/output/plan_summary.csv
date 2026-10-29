@@ -1,6 +1,6 @@
 item,value
 discount,0.2
-coupon_weeks,1 2 3 4
+coupon_weeks,48 49 50 51
 app_users,260000
 redemption_rate,0.119
 reference_rate_for_this_discount,0.1195
@@ -14,22 +14,22 @@ bought_anyway,30074
 incremental_units,25618
 dip_units,7173
 net_incremental_units,18445
-dip_after_week_52,0
-demand_in_coupon_weeks,108167
-sigma,6930
-sigma_from_baseline,4202
+dip_after_week_52,2513
+demand_in_coupon_weeks,137242
+sigma,7915
+sigma_from_baseline,5682
 sigma_from_redemption_rate,5124
 sigma_from_incremental_share,2028
 target_fill_rate,0.98
-z,0.1875
-volume_to_commit,109466
-buffer,1300
-fill_rate_if_only_forecast_committed,0.9744
-coupon_start,2025-12-29
+z,0.1091
+volume_to_commit,138105
+buffer,863
+fill_rate_if_only_forecast_committed,0.977
+coupon_start,2026-11-23
 lead_time_days,96
-commit_deadline,2025-09-24
+commit_deadline,2026-08-19
 delivery_days,Mon
-shelf_peak_stretch,Mon-Sat week 1
-shelf_peak_share_of_normal_week,1.1508
+shelf_peak_stretch,Mon-Sat week 48
+shelf_peak_share_of_normal_week,1.4379
 shelf_products_short,3
 shelf_suggested_extra_delivery,Fri

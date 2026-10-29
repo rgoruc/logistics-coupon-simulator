@@ -1329,8 +1329,8 @@ tr.is-closed td { color: var(--muted); }
       const withDisp = r100(s.couponBaseline) + r100(s.incremental);
       kpiTiles($("kpis"), [
         { label: `Without the coupon, weeks ${Math.min(...s.weeks)} to ${Math.max(...s.weeks)}`, value: plain100(s.couponBaseline), sub: `units of normal demand · ${palBase} pallets` },
-        { label: "With the coupon", value: plain100(withDisp), sub: `${plain100(s.redemptions)} redemptions · ${plain100(s.couponUnits)} units sold with it` },
-        { label: "Extra units from the coupon", value: hundreds(s.incremental), sub: `${signed(palWith - palBase)} pallets · ${hundreds(s.net)} net after the dip`, net: true },
+        { label: "With the coupon", value: plain100(withDisp), sub: "units of demand with the coupon" },
+        { label: "Extra units from the coupon", value: hundreds(s.incremental), sub: `${Math.round(s.incremental / s.couponUnits * 100)}% of the ${plain100(s.couponUnits)} units bought with the coupon · ${hundreds(s.net)} net after the dip`, net: true },
         { label: `Commit by ${fmtDate(due)}`, value: plain100(C.q), sub: `units for a ${state.fill}% fill rate · ${Math.abs(C.buffer) < 50 ? "no buffer needed" : hundreds(C.buffer) + " buffer on the forecast"}` },
       ]);
       // what the coupon means for logistics, in three lines: sales, logistics, shelf

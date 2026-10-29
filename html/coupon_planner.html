@@ -673,7 +673,7 @@ const Model = (() => {
   const MAU_2026 = 260000;
   const DELIVERY_DEFAULT = [0];
   // plan defaults from data/input/plan_assumptions.csv (null = computed from the past coupons)
-  const DEFAULTS = {"discount": 20, "startWeek": 1, "fullWeeks": 4, "unc": 20, "lead": 96, "depth": 6, "rate": null, "upr": null, "inc": null, "pull": null, "fill": null, "price": null, "controlPrice": null, "marketAvg": 1.5};
+  const DEFAULTS = {"discount": 20, "startWeek": 48, "fullWeeks": 4, "unc": 20, "lead": 96, "depth": 6, "rate": null, "upr": null, "inc": null, "pull": null, "fill": null, "price": null, "controlPrice": null, "marketAvg": 1.5};
   const SHELF = [{"sku": "Deo Test Brand spray 200 ml (top seller)", "normalWeek": 38.0, "facings": 7}, {"sku": "Deo Test Brand roll-on 50 ml", "normalWeek": 18.0, "facings": 3}, {"sku": "Other Deo Test Brand SKUs (average per SKU)", "normalWeek": 6.0, "facings": 1}];
   // Past Deo Test Brand app coupons in the region. rateObs = redemptions / app users; upr = units per redemption.
   // All three are measured from the data with the counterfactual.
@@ -4075,8 +4075,8 @@ const Model = (() => {
       const withDisp = r100(s.couponBaseline) + r100(s.incremental);
       kpiTiles($("kpis"), [
         { label: `Without the coupon, weeks ${Math.min(...s.weeks)} to ${Math.max(...s.weeks)}`, value: plain100(s.couponBaseline), sub: `units of normal demand · ${palBase} pallets` },
-        { label: "With the coupon", value: plain100(withDisp), sub: `${plain100(s.redemptions)} redemptions · ${plain100(s.couponUnits)} units sold with it` },
-        { label: "Extra units from the coupon", value: hundreds(s.incremental), sub: `${signed(palWith - palBase)} pallets · ${hundreds(s.net)} net after the dip`, net: true },
+        { label: "With the coupon", value: plain100(withDisp), sub: "units of demand with the coupon" },
+        { label: "Extra units from the coupon", value: hundreds(s.incremental), sub: `${Math.round(s.incremental / s.couponUnits * 100)}% of the ${plain100(s.couponUnits)} units bought with the coupon · ${hundreds(s.net)} net after the dip`, net: true },
         { label: `Commit by ${fmtDate(due)}`, value: plain100(C.q), sub: `units for a ${state.fill}% fill rate · ${Math.abs(C.buffer) < 50 ? "no buffer needed" : hundreds(C.buffer) + " buffer on the forecast"}` },
       ]);
       // what the coupon means for logistics, in three lines: sales, logistics, shelf
