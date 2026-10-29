@@ -10,7 +10,7 @@
      coupons and the dip after them, and is frozen during a coupon at the 6 weeks before it.
    - The control brand (Deo Control Brand) gets the same model: the cross-check of the control assumption.
    - Plan: the frozen neutral baseline x the drivers of each plan day (this year's calendar, the season, normal weather
-     or a cold / warm scenario); incremental units from redemptions; fill rate, volume to commit 96 days ahead, pallets,
+     or a cold / warm scenario); incremental units from redemptions; fill rate, volume to commit 96 days ahead,
      shelf facings. The Python model (model/) gives the same numbers; tests/check_numbers.py checks it. */
 const Model = (() => {
   const NAME = "Deo Test Brand", CONTROL = "Deo Control Brand";
@@ -26,7 +26,6 @@ const Model = (() => {
   ];
   const C25 = OWN.find((c) => c.year === 2025), C26 = OWN.find((c) => c.year === YEAR) || null; // no coupon in the plan year's data: null
   const TRAIN_YEARS = [2024, 2025]; // the drivers are fitted here; 2026 is the test
-  const PALLET = __PALLET__;
   const MAU_2026 = __MAU__;
   const DELIVERY_DEFAULT = __DELIVERY__;
   // plan defaults from data/input/plan_assumptions.csv (null = computed from the past coupons)
@@ -674,11 +673,10 @@ const Model = (() => {
     if (suggestion) suggestion.fitsAll = SHELF.every((s) => s.normalWeek * suggestion.factor <= s.facings * depth + 1e-9);
     return { peak, items, suggestion };
   }
-  const pallets = (units) => Math.ceil(units / PALLET - 1e-9);
 
-  return { NAME, CONTROL, DAYS, HOURS, PLAN_WEEKS, YEAR_WEEKS, YEAR, LAST_DATA, OWN, C25, C26, TRAIN_YEARS, PALLET, MAU_2026, DELIVERY_DEFAULT, DEFAULTS, SHELF, WK, HOURLY,
+  return { NAME, CONTROL, DAYS, HOURS, PLAN_WEEKS, YEAR_WEEKS, YEAR, LAST_DATA, OWN, C25, C26, TRAIN_YEARS, MAU_2026, DELIVERY_DEFAULT, DEFAULTS, SHELF, WK, HOURLY,
     CAL, WEATHER, FEATS, DRIVER_NAMES, feat, robustLevel, windowFor, calibrate, reference, shareFor, lengthShare, startWeeks, normalDemand, weatherFactor, dayShares, hourShares, dayDrivers,
-    COUPON_LENGTHS, forecast, daily, hourly, intervals, spanLabel, shelfCheck, pallets,
+    COUPON_LENGTHS, forecast, daily, hourly, intervals, spanLabel, shelfCheck,
     deadline: (start, lead) => new Date(start.getTime() - lead * DAY_MS), isoMonday, dayKey, price, fr, row };
 })();
 if (typeof module !== "undefined") module.exports = Model;

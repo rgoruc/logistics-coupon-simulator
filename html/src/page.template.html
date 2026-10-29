@@ -596,9 +596,9 @@ tr.is-closed td { color: var(--muted); }
       <div class="note" id="fill-note"></div>
     </div>
     <div class="card">
-      <div class="card-title"><h2>Distribution centre: pallets per week</h2><span class="small">Demand, 1,200 units per pallet</span></div>
-      <p class="note" id="pallet-note"></p>
-      <div class="table-wrap"><table id="pallet-table"></table></div>
+      <div class="card-title"><h2>Distribution centre: units per week</h2><span class="small">Demand</span></div>
+      <p class="note" id="dc-note"></p>
+      <div class="table-wrap"><table id="dc-table"></table></div>
       <div class="status info"><span class="icon" aria-hidden="true">i</span><p id="lastyear-note"></p></div>
     </div>
     <div class="card">
@@ -1219,7 +1219,6 @@ tr.is-closed td { color: var(--muted); }
         `Lead time: ${state.lead} days between the volume commit and the coupon start.`,
         `Target fill rate: ${state.fill}% ` + (state.fill === fillD ? "(average of normal weeks)." : `(your setting; normal weeks: ${fillD}%).`),
         `Redemption-rate uncertainty: ±${state.unc}%, used for the buffer in the volume to commit.`,
-        `${nf.format(M.PALLET)} units per pallet.`,
         "Store delivery: " + (state.delivery.length === 1 ? `once a week, on ${FULL_DAY[state.delivery[0]]}.` : `on ${andList(state.delivery.map((d) => FULL_DAY[d]))}.`),
         `Shelf, one high-volume store: ${M.SHELF.map((x, i) => `${shortSku(x.sku)} ${x.facings}${i === 0 ? " facings" : ""}`).join(", ")}; ${state.depth} units per facing; a normal week sells ${M.SHELF.map((x) => nf.format(x.normalWeek)).join(" / ")} units.`,
       ]],
@@ -1324,11 +1323,10 @@ tr.is-closed td { color: var(--muted); }
     const shelfRes = ready ? M.shelfCheck(cal, sc, res, state.delivery, state.depth) : null;
     if (ready) {
       const cw = res.rows.filter((r) => r.coupon);
-      const palBase = cw.reduce((a, r) => a + M.pallets(r.baseline), 0), palWith = cw.reduce((a, r) => a + M.pallets(r.demand), 0);
       // shown rounded to 100: "with" = rounded "without" + rounded extra, so the three tiles add up
       const withDisp = r100(s.couponBaseline) + r100(s.incremental);
       kpiTiles($("kpis"), [
-        { label: `Without the coupon, weeks ${Math.min(...s.weeks)} to ${Math.max(...s.weeks)}`, value: plain100(s.couponBaseline), sub: `units of normal demand · ${palBase} pallets` },
+        { label: `Without the coupon, weeks ${Math.min(...s.weeks)} to ${Math.max(...s.weeks)}`, value: plain100(s.couponBaseline), sub: "units of normal demand" },
         { label: "With the coupon", value: plain100(withDisp), sub: "units of demand with the coupon" },
         { label: "Extra units from the coupon", value: hundreds(s.incremental), sub: `${Math.round(s.incremental / s.couponUnits * 100)}% of the ${plain100(s.couponUnits)} units bought with the coupon · ${hundreds(s.net)} net after the dip`, net: true },
         { label: `Commit by ${fmtDate(due)}`, value: plain100(C.q), sub: `units for a ${state.fill}% fill rate · ${Math.abs(C.buffer) < 50 ? "no buffer needed" : hundreds(C.buffer) + " buffer on the forecast"}` },
@@ -1339,8 +1337,7 @@ tr.is-closed td { color: var(--muted); }
         sp.append(el("span", "tk-label", label), ...parts.map((p) => (typeof p === "string" ? document.createTextNode(p) : p)));
         return sp;
       };
-      const peakRow = res.rows.filter((r) => r.coupon).reduce((a, b) => (M.pallets(b.demand) > M.pallets(a.demand) ? b : a));
-      const peakPal = M.pallets(peakRow.demand);
+      const peakRow = res.rows.filter((r) => r.coupon).reduce((a, b) => (b.demand > a.demand ? b : a));
       const whatIf = state.startWeek <= M.LAST_DATA;
       const short = shelfRes.items.filter((x) => x.needed > x.facings);
       const sug = shelfRes.suggestion;
@@ -1349,8 +1346,8 @@ tr.is-closed td { color: var(--muted); }
           `; of the ${plain100(s.couponUnits)} units sold with the coupon the rest would have been bought anyway. After the dip in the three weeks that follow: `, el("strong", null, `${plain100(s.net)} extra units net`), "." +
           (s.dipOutside > 0 ? ` About ${plain100(s.dipOutside)} units of the dip fall after week 52.` : "")),
         line("Logistics", whatIf ? "Supply chain would have had to commit " : "Supply chain has to commit ", el("strong", null, `${plain100(C.q)} units`), ` for the coupon weeks by `, el("strong", null, fmtDate(due)),
-          `, ${state.lead} days before the start, for a ${state.fill}% fill rate. The distribution centre peaks at `, el("strong", null, `${peakPal} pallets a week`),
-          ` instead of ${M.pallets(peakRow.baseline)} in week ${peakRow.week}.`),
+          `, ${state.lead} days before the start, for a ${state.fill}% fill rate. The distribution centre peaks at `, el("strong", null, `${plain100(peakRow.demand)} units a week`),
+          ` instead of ${plain100(peakRow.baseline)} in week ${peakRow.week}.`),
         line("Shelf", short.length
           ? `In a high-volume store ${short.length === 1 ? "one product needs" : short.length + " products need"} more facings in the coupon weeks` +
             (sug ? `, or an extra ${sug.day} delivery${sug.fitsAll ? ", which is enough" : ", which is not enough on its own"}.` : ".")
@@ -1406,16 +1403,16 @@ tr.is-closed td { color: var(--muted); }
     else stats($("fill-stats"), [[DASH, "demand in the coupon weeks"], [DASH, `sales at ${state.fill}%`], [DASH, "lost on empty shelves"]]);
     note("fill-note", `Last year the coupon was not in the replenishment plan: the fill rate fell to ${pct0(M.fr(2025, "test", 43))} in the launch week and ${plain100(cal.lost25)} units of demand found an empty shelf.`,
       `It averaged ${pct1(cal.frc25)} over the coupon. Measured on sales the 2025 coupon added ${plain100(cal.extraOnSales25)} units; with full shelves it would have been ${plain100(cal.extra25)} (demand = sales ÷ fill rate).`);
-    table("pallet-table", ["Week", "Without coupon", "With coupon"],
-      plan.map((r) => [weekCell(r), String(M.pallets(r.baseline)), ready ? String(M.pallets(r.demand)) : blank]),
+    table("dc-table", ["Week", "Without coupon", "With coupon"],
+      plan.map((r) => [weekCell(r), nf.format(Math.round(r.baseline)), ready ? nf.format(Math.round(r.demand)) : blank]),
       (i) => (plan[i].coupon ? "is-coupon" : null));
     if (ready) {
-      const peakRow = res.rows.filter((r) => r.coupon).reduce((a, b) => (M.pallets(b.demand) > M.pallets(a.demand) ? b : a));
-      const lowWeeks = res.rows.filter((r) => r.dipWeek && M.pallets(r.demand) < M.pallets(r.baseline)).length;
-      $("pallet-note").textContent = `Peak: ${M.pallets(peakRow.demand)} pallets in week ${peakRow.week} against ${M.pallets(peakRow.baseline)} without the coupon.` + (lowWeeks ? ` After the coupon the need drops below normal for ${lowWeeks === 1 ? "one week" : lowWeeks + " weeks"}.` : "");
-    } else $("pallet-note").textContent = "Enter the redemption rate to see the pallets with the coupon.";
-    const pal = (w) => Math.round(M.row(2025, w).dc_orders_test / M.PALLET);
-    $("lastyear-note").textContent = `Last year's coupon (weeks 43 to 47) was not in the replenishment forecast. Distribution centre orders jumped from ${pal(42)} to ${pal(43)} pallets when it started and fell to ${pal(48)} after it ended.`;
+      const peakRow = res.rows.filter((r) => r.coupon).reduce((a, b) => (b.demand > a.demand ? b : a));
+      const lowWeeks = res.rows.filter((r) => r.dipWeek && r.demand < r.baseline - 0.5).length;
+      $("dc-note").textContent = `Peak: ${plain100(peakRow.demand)} units in week ${peakRow.week} against ${plain100(peakRow.baseline)} without the coupon.` + (lowWeeks ? ` After the coupon the need drops below normal for ${lowWeeks === 1 ? "one week" : lowWeeks + " weeks"}.` : "");
+    } else $("dc-note").textContent = "Enter the redemption rate to see the volume with the coupon.";
+    const pal = (w) => plain100(M.row(2025, w).dc_orders_test);
+    $("lastyear-note").textContent = `Last year's coupon (weeks 43 to 47) was not in the replenishment forecast. Distribution centre orders jumped from ${pal(42)} to ${pal(43)} units when it started and fell to ${pal(48)} after it ended.`;
 
     const sel = $("daily-week");
     if (!plan.some((r) => r.week === state.dailyWeek)) state.dailyWeek = state.startWeek;
@@ -1797,7 +1794,7 @@ tr.is-closed td { color: var(--muted); }
   /* ---------- method ---------- */
   function renderMethod() {
     const items = [
-      "Goal: show the marketing team, before a coupon is launched, what it means for logistics: the extra units, the volume and the deadline for supply chain, the pallets in the distribution centre and the shelf in the stores. Extra (incremental) units are the units the coupon adds, which would not have been sold without it. Customers activate the coupon in the Drugstore app and redeem it at the till; the data are store sales.",
+      "Goal: show the marketing team, before a coupon is launched, what it means for logistics: the extra units, the volume and the deadline for supply chain, the weekly volume in the distribution centre and the shelf in the stores. Extra (incremental) units are the units the coupon adds, which would not have been sold without it. Customers activate the coupon in the Drugstore app and redeem it at the till; the data are store sales.",
       "Baseline (the rule, per hour): for each weekday and opening hour, 08:00 to 20:00, the same weekday and hour in the last 6 weeks, as neutral demand (demand ÷ the drivers of the day). Ranked high to low, values above the middle value + 2 × the standard deviation of the middle ranks + 2 are outliers; the baseline is the average of the 3 values around the median of the rest. Closed days and closed hours are left out.",
       `Rolling, then frozen: the window moves with every week (the 6 weeks before that week) and skips weeks of ${B}'s own coupons and the dip after them. During a coupon and its dip it is frozen at the 6 weeks before the coupon, so the coupon cannot leak into its own baseline. With data up to week 42, the 2026 plan uses weeks 37 to 42.`,
       `Drivers: normal demand of a day = baseline × season × calendar × weather × price. Season: a smooth yearly curve (5 sine/cosine pairs). Calendar: the first and second shopping day before a public holiday and the run-up to Christmas (1 to 24 December). Weather: the daily maximum temperature against its seasonal normal (Karlsruhe). Price: ${B}'s shelf price ÷ the category price index (the volume-weighted average shelf price of men's deo in the Drugstore, weekly), against its usual level. The effects are measured together in one regression on the log of daily demand, on ${cal.trainYears.join(" and ")}, outside ${B}'s own coupons (Drivers card). The weekday and the level are not in the regression: the baseline carries them.`,

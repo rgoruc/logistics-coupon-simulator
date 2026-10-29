@@ -28,7 +28,7 @@ for p in (str(ROOT), str(APP)):
 import planner_charts as charts  # noqa: E402
 import config  # noqa: E402
 from model import (COUPON_LENGTHS, CONTROL, DAYS, NAME, calibrate, daily, day_drivers, deadline, default_scenario,  # noqa: E402
-                   forecast, hourly, intervals, iso_monday, length_share, load, pallets, reference_rate, share_for,
+                   forecast, hourly, intervals, iso_monday, length_share, load, reference_rate, share_for,
                    shelf_check, normal_demand, span_label, start_weeks)
 from model.baseline import RuleSettings  # noqa: E402
 from model.mathutil import js_round  # noqa: E402
@@ -252,7 +252,6 @@ ASSUMPTIONS = [
         f"Lead time: {lead} days between the volume commit and the coupon start.",
         f"Target fill rate: {fill}% " + ("(average of normal weeks)." if fill == fill_d else f"(your setting; normal weeks: {fill_d}%)."),
         f"Redemption-rate uncertainty: ±{unc}%, used for the buffer in the volume to commit.",
-        f"{sc.pallet_units:,} units per pallet.",
         "Store delivery: " + (f"once a week, on {FULL_DAY[deliv[0]]}." if len(deliv) == 1 else "on " + and_list(deliv) + "."),
         "Shelf, one high-volume store: " + ", ".join(f"{short_sku(x.sku)} {x.facings}" + (" facings" if i == 0 else "")
                                                      for i, x in enumerate(data.shelf))
@@ -264,11 +263,9 @@ end_date = iso_monday(py, end) + dt.timedelta(days=5)
 st.markdown(f"**{NAME} · {discount}% off · week {start} to {end}** · {ddmmm(s['startDate'])} to {ddmmm(end_date, True)}")
 
 due = deadline(s["startDate"], int(lead))
-cw = [r for r in res.rows if r["coupon"]]
-pal_base, pal_with = sum(pallets(r["baseline"], sc.pallet_units) for r in cw), sum(pallets(r["demand"], sc.pallet_units) for r in cw)
 k1, k2, k3, k4 = st.columns(4)
 k1.metric(f"Without the coupon, weeks {min(s['weeks'])} to {max(s['weeks'])}", h100(s["couponBaseline"]))
-k1.caption(f"units of normal demand · {pal_base} pallets")
+k1.caption("units of normal demand")
 # shown rounded to 100: "with" = rounded "without" + rounded extra, so the three tiles add up
 with_disp = js_round(s["couponBaseline"] / 100) * 100 + js_round(s["incremental"] / 100) * 100
 k2.metric("With the coupon", h100(with_disp))
@@ -283,8 +280,7 @@ if ready:
     shelf = shelf_check(cal, sc, res)
     short = [x for x in shelf["items"] if x["needed"] > x["facings"]]
     sug = shelf["suggestion"]
-    peak_row = max((r for r in res.rows if r["coupon"]), key=lambda r: pallets(r["demand"], sc.pallet_units))
-    peak_pal = pallets(peak_row["demand"], sc.pallet_units)
+    peak_row = max((r for r in res.rows if r["coupon"]), key=lambda r: r["demand"])
     shelf_text = ("the current facings hold the peak in a high-volume store." if not short else
                   f"in a high-volume store {'one product needs' if len(short) == 1 else f'{len(short)} products need'} more facings "
                   "in the coupon weeks" + ((f", or an extra {sug['day']} delivery, "
@@ -296,7 +292,7 @@ if ready:
         + (f" About {h100(s['dipOutside'])} units of the dip fall after week 52." if s["dipOutside"] > 0 else "")
         + f"\n\n**Logistics:** supply chain {'would have had' if start <= lw else 'has'} to commit **{h100(C['q'])} units** for the "
         f"coupon weeks by **{ddmmm(due, True)}**, {lead} days before the start, for a {fill}% fill rate. The distribution centre peaks at "
-        f"**{peak_pal} pallets a week** instead of {pallets(peak_row['baseline'], sc.pallet_units)} in week {peak_row['week']}."
+        f"**{h100(peak_row['demand'])} units a week** instead of {h100(peak_row['baseline'])} in week {peak_row['week']}."
         + "\n\n**Shelf:** " + shelf_text)
 else:
     st.info("Enter the number of app users and a redemption rate above zero to run the plan.")
@@ -492,15 +488,15 @@ with tab_s:
     st.caption(f"Last year the coupon was not in the replenishment plan. The fill rate averaged {pct(cal.ref.frc)} over the coupon: "
                f"{h100(cal.ref.lost)} units of demand found an empty shelf. Measured on sales the {cal.ref.coupon.year} coupon added "
                f"{h100(cal.extra_on_sales_ref)} units; with full shelves it would have been {h100(cal.ref.extra)} (demand = sales ÷ fill rate).")
-    st.subheader("Distribution centre: pallets per week")
-    st.dataframe(pd.DataFrame([{"Week": f"{r['week']} · {ddmmm(r['monday'])}", "Without coupon": pallets(r["baseline"], sc.pallet_units),
-                                "With coupon": pallets(r["demand"], sc.pallet_units)} for r in view]), hide_index=True)
+    st.subheader("Distribution centre: units per week")
+    st.dataframe(pd.DataFrame([{"Week": f"{r['week']} · {ddmmm(r['monday'])}", "Without coupon": round(r["baseline"]),
+                                "With coupon": round(r["demand"])} for r in view]), hide_index=True)
     c0 = cal.ref.coupon
-    dc = lambda w: js_round(data.row(c0.year, w)["test_dc_orders"] / sc.pallet_units)  # noqa: E731
-    st.caption((f"Peak: {peak_pal} pallets in week {peak_row['week']} against {pallets(peak_row['baseline'], sc.pallet_units)} without "
-                f"the coupon ({sc.pallet_units:,} units per pallet). " if ready else "")
+    dc = lambda w: h100(data.row(c0.year, w)["test_dc_orders"])  # noqa: E731
+    st.caption((f"Peak: {h100(peak_row['demand'])} units in week {peak_row['week']} against {h100(peak_row['baseline'])} without "
+                "the coupon. " if ready else "")
                + f"Last year's coupon was not in the replenishment forecast: distribution centre orders jumped from {dc(c0.start - 1)} to "
-               f"{dc(c0.start)} pallets when it started and fell to {dc(min(c0.post))} after it ended.")
+               f"{dc(c0.start)} units when it started and fell to {dc(min(c0.post))} after it ended.")
     st.subheader("Daily and hourly plan")
     wk = st.selectbox("Week", [r["week"] for r in view], index=[r["week"] for r in view].index(start),
                       format_func=lambda w: f"Week {w}" + (" · coupon" if w in s["weeks"] else ""))
@@ -602,7 +598,7 @@ with tab_m:
     c_yrs = sorted(chk["years"])
     st.markdown("\n".join(f"- {t}" for t in [
         "**Goal:** show the marketing team, before a coupon is launched, what it means for logistics: the extra units, the volume "
-        "and the deadline for supply chain, the pallets in the distribution centre and the shelf in the stores. Extra (incremental) "
+        "and the deadline for supply chain, the weekly volume in the distribution centre and the shelf in the stores. Extra (incremental) "
         "units are the units the coupon adds, which would not have been sold without it. Customers activate the coupon in the "
         "Drugstore app and redeem it at the till; the data are store sales.",
         f"**Baseline (your rule, per hour):** for each weekday and opening hour, the same weekday and hour in the last "

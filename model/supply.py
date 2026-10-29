@@ -1,4 +1,4 @@
-"""Supply chain checks: commit deadline, pallets and the shelf check for a high-volume store.
+"""Supply chain checks: commit deadline and the shelf check for a high-volume store.
 
 Shelf: each delivery has to cover the selling days until the next delivery. The check takes the heaviest
 stretch between two deliveries in the coupon weeks and compares it with facings x units per facing. Demand is
@@ -18,10 +18,6 @@ from .plan import Forecast, Scenario, daily
 
 def deadline(start: dt.date, lead_days: int) -> dt.date:
     return start - dt.timedelta(days=lead_days)
-
-
-def pallets(units: float, pallet_units: int = 1200) -> int:
-    return math.ceil(units / pallet_units - 1e-9)
 
 
 def intervals(delivery_days: list) -> list:

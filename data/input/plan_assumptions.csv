@@ -13,7 +13,6 @@ target_fill_rate,,Target fill rate; empty = average of normal weeks rounded to 1
 lead_time_days,96,Days between the commit and the coupon start
 units_per_facing,6,Units one facing holds on the shelf (shelf check)
 delivery_days,Mon,Store delivery day (assumption): one delivery a week on Monday
-pallet_units,1200,Units per pallet
 test_price,,Regular shelf price of Deo Test Brand; empty = latest price in the data
 control_price,,Regular shelf price of Deo Control Brand; empty = latest price in the data
 market_avg_price,1.50,Average deo shelf price in the drugstore (shown for comparison; not used in the counterfactual)

@@ -14,7 +14,7 @@ from .drivers import Calendar, Weather, DRIVER_NAMES
 from .calibrate import Calibration, calibrate
 from .plan import (Scenario, default_scenario, reference_rate, share_for, coupon_plan, forecast, daily, hourly, max_full_weeks,
                    COUPON_LENGTHS, LAST_WEEK, length_share, start_weeks, normal_demand, day_shares, hour_shares, weather_factor, day_drivers)
-from .supply import deadline, pallets, intervals, span_label, shelf_check
+from .supply import deadline, intervals, span_label, shelf_check
 
 
 def load(folder="data/input", hours=None) -> Data:

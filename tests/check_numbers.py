@@ -19,7 +19,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from model import (calibrate, daily, day_drivers, deadline, default_scenario, forecast, hourly, intervals, load, pallets,  # noqa: E402
+from model import (calibrate, daily, day_drivers, deadline, default_scenario, forecast, hourly, intervals, load,  # noqa: E402
                    reference_rate, shelf_check, share_for, start_weeks)
 from model.mathutil import js_round  # noqa: E402
 from model.baseline import RuleSettings  # noqa: E402
@@ -68,7 +68,7 @@ def python_numbers() -> dict:
         "reference2w": reference_rate(cal, 0.2, 2), "reference30_2w": reference_rate(cal, 0.3, 2),
         "startWeeks2": start_weeks(data, 2), "startWeeks4": start_weeks(data, 4),
         "rows2w": [{"week": r["week"], "coupon": r["coupon"], "share": r["share"], "redemptions": r["redemptions"],
-                    "incremental": r["incremental"], "dip": r["dip"], "demand": r["demand"], "palletsDemand": pallets(r["demand"])}
+                    "incremental": r["incremental"], "dip": r["dip"], "demand": r["demand"]}
                    for r in res2.rows],
         "shelf2w": shelf_check(cal, sc2, res2, [0], 6),
         "default1": {"startWeek": sc1.start_week, "summary": summ(res1.summary, ["weeks", "couponDemand", "couponBaseline", "commit"]),
@@ -117,8 +117,7 @@ def python_numbers() -> dict:
                      "fillRate": sc.fill_rate, "rateUnc": sc.rate_unc, "price": sc.price, "controlPrice": sc.control_price, "planAnomaly": sc.plan_anomaly},
         "rows": [{"week": r["week"], "coupon": r["coupon"], "share": r["share"], "couponDays": r["couponDays"], "baseline": r["baseline"],
                   "redemptions": r["redemptions"], "couponUnits": r["couponUnits"], "incremental": r["incremental"], "dip": r["dip"],
-                  "demand": r["demand"], "sales": r["sales"], "lost": r["lost"], "palletsBase": pallets(r["baseline"]),
-                  "palletsDemand": pallets(r["demand"])} for r in res.rows],
+                  "demand": r["demand"], "sales": r["sales"], "lost": r["lost"]} for r in res.rows],
         "summary": {**{k: s[k] for k in ["weeks", "redemptions", "couponUnits", "anyway", "incremental", "dip", "net", "dipOutside",
                                          "couponDemand", "couponBaseline", "couponSales", "couponLost", "commit", "price"]},
                     "startDate": s["startDate"].isoformat(), "deadline": deadline(s["startDate"], 96).isoformat()},

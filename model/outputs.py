@@ -13,7 +13,7 @@ from .data import DAYS, day_date, iso_monday
 from .drivers import DRIVER_NAMES
 from .mathutil import js_round
 from .plan import Forecast, Scenario, reference_rate, share_for, weather_factor
-from .supply import deadline, pallets, shelf_check
+from .supply import deadline, shelf_check
 
 
 def _r(x, nd=1):
@@ -135,9 +135,7 @@ def plan_weeks(cal: Calibration, sc: Scenario, res: Forecast) -> pd.DataFrame:
                           "coupon_days": " ".join(DAYS[d] for d in r["couponDays"]), "share_of_coupon": _r(r["share"], 4),
                           "redemptions": _r(r["redemptions"], 0), "units_with_coupon": _r(r["couponUnits"], 0),
                           "counterfactual": _r(r["baseline"], 0), "incremental": _r(r["incremental"], 0), "dip": _r(-r["dip"], 0),
-                          "demand": _r(r["demand"], 0), "sales_at_target_fill_rate": _r(r["sales"], 0), "lost": _r(r["lost"], 0),
-                          "pallets_without_coupon": pallets(r["baseline"], sc.pallet_units),
-                          "pallets_with_coupon": pallets(r["demand"], sc.pallet_units)} for r in res.rows])
+                          "demand": _r(r["demand"], 0), "sales_at_target_fill_rate": _r(r["sales"], 0), "lost": _r(r["lost"], 0)} for r in res.rows])
 
 
 def full_year(cal: Calibration, sc: Scenario, res: Forecast) -> pd.DataFrame:

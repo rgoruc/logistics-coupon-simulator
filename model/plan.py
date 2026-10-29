@@ -39,7 +39,6 @@ class Scenario:
     lead_time_days: int = 96
     units_per_facing: int = 6
     delivery_days: list = field(default_factory=lambda: [0, 2, 4])  # 0 = Mon ... 5 = Sat
-    pallet_units: int = 1200
     plan_anomaly: float = 0.0          # weather in the plan weeks: degrees above the seasonal normal (0 = normal)
 
     def with_(self, **kw) -> "Scenario":
@@ -158,8 +157,7 @@ def default_scenario(cal: Calibration) -> Scenario:
         price=a.get("test_price") or data.price(py, "test", lw), control_price=a.get("control_price") or data.price(py, "control", lw),
         market_avg_price=a.get("market_avg_price") or 1.50,
         lead_time_days=int(a.get("lead_time_days") if a.get("lead_time_days") is not None else 96),
-        units_per_facing=int(a.get("units_per_facing") or 6), delivery_days=sorted(set(days)),
-        pallet_units=int(a.get("pallet_units") or 1200))
+        units_per_facing=int(a.get("units_per_facing") or 6), delivery_days=sorted(set(days)),)
 
 
 def coupon_plan(cal: Calibration, sc: Scenario) -> dict:

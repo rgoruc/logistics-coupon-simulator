@@ -4,7 +4,7 @@ For the marketing team: what an app coupon means for logistics before it is laun
 data: the **Drugstore** runs an app coupon on **Deo Test Brand** (men's deo, shelf price €1.00; the average deo in
 the Drugstore costs €1.50). The model measures how many units a coupon really adds (incremental units, against a
 counterfactual) and turns the next coupon into what logistics needs to know: the extra units, the volume supply
-chain has to commit 96 days ahead and the deadline, the pallets per week in the distribution centre, the dip after
+chain has to commit 96 days ahead and the deadline, the weekly volume in the distribution centre, the dip after
 the coupon and the shelf in the stores. Normal demand is the baseline rule × four measured drivers (season, calendar,
 weather, price against the category price index). **Deo Control Brand** (€2.00) is the control brand: it gets the
 same model as a cross-check.

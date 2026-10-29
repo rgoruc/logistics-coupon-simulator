@@ -97,7 +97,7 @@ def build(folder: Path) -> str:
         "marketAvg": a.get("market_avg_price"),
     }
     src = (HERE / "src" / "model.src.js").read_text(encoding="utf-8")
-    for key, val in {"__PALLET__": str(int(a.get("pallet_units") or 1200)), "__MAU__": str(int(a.get("app_users") or 0)),
+    for key, val in {"__MAU__": str(int(a.get("app_users") or 0)),
                      "__DELIVERY__": json.dumps(delivery), "__DEFAULTS__": json.dumps(defaults), "__SHELF__": json.dumps(shelf, ensure_ascii=False),
                      "__PAST__": json.dumps(past, ensure_ascii=False), "__WEEKLY__": "\n".join(weekly), "__HOURLY__": "\n".join(hourly),
                      "__TEMPERATURE__": "\n".join(temperature), "__HOLIDAYS__": "\n".join(holidays)}.items():
