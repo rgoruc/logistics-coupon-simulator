@@ -25,6 +25,23 @@ for p in (str(ROOT), str(APP)):
     if p not in sys.path:
         sys.path.insert(0, p)
 
+
+def code_stamp() -> str:
+    """The model code as it is on disk (model/*.py, config.py, app/planner_charts.py)."""
+    import hashlib
+    h = hashlib.md5()
+    for f in sorted([*(ROOT / "model").glob("*.py"), ROOT / "config.py", APP / "planner_charts.py"]):
+        h.update(f.name.encode()); h.update(f.read_bytes())
+    return h.hexdigest()
+
+
+CODE_STAMP = code_stamp()
+# Streamlit Cloud pulls new code without restarting Python, and Streamlit reloads only this script: when the model code
+# changed, drop the modules an older run imported, so this run imports the files as they are now.
+if sys.modules.get("model") is not None and getattr(sys.modules["model"], "CODE_STAMP", None) != CODE_STAMP:
+    for _name in [m for m in sys.modules if m in ("model", "config", "planner_charts") or m.startswith("model.")]:
+        del sys.modules[_name]
+
 import planner_charts as charts  # noqa: E402
 import config  # noqa: E402
 from model import (COUPON_LENGTHS, CONTROL, DAYS, NAME, calibrate, daily, day_drivers, deadline, default_scenario,  # noqa: E402
@@ -33,6 +50,9 @@ from model import (COUPON_LENGTHS, CONTROL, DAYS, NAME, calibrate, daily, day_dr
 from model.baseline import RuleSettings  # noqa: E402
 from model.mathutil import js_round  # noqa: E402
 from model.outputs import all_tables, chart_rows_full_year, window_label  # noqa: E402
+import model  # noqa: E402
+
+model.CODE_STAMP = CODE_STAMP
 
 st.set_page_config(page_title="Logistics Coupon Simulator", layout="wide")
 
@@ -98,9 +118,9 @@ def ddmmm(d: dt.date, year: bool = False) -> str:
 
 
 @st.cache_resource(show_spinner="Fitting the drivers, the baseline and the counterfactual ...")
-def get_model(inputs_stamp: str):
+def get_model(inputs_stamp: str, code: str):
     """The rule is fixed (config.py: the last 6 weeks); the drivers are fitted on the years before the plan year.
-    inputs_stamp: the contents of data/input, so the cache refreshes when an input file changes."""
+    inputs_stamp and code: the contents of data/input and of the model code, so the cache refreshes when either changes."""
     data = load(ROOT / config.DATA_DIR)
     return calibrate(data, RuleSettings.from_config(config), config.REFERENCE_COUPON_YEAR)
 
@@ -131,7 +151,7 @@ def inputs_stamp() -> str:
     return h.hexdigest()
 
 
-cal = get_model(inputs_stamp())
+cal = get_model(inputs_stamp(), CODE_STAMP)
 data = cal.data
 py, lw = data.plan_year(), data.last_data_week()
 D = default_scenario(cal)
