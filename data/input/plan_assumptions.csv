@@ -1,0 +1,19 @@
+parameter,value,note
+plan_year,2026,Year of the planned coupon
+start_week,1,First coupon week (Monday): 1 to 49 for a 4-week coupon or 1 to 51 for a 2-week coupon (weeks up to 42 are a what-if on the 2026 data)
+full_weeks,4,Coupon length in weeks: 2 or 4 (Monday to Saturday)
+discount,0.20,Coupon discount: 0.10 or 0.20 or 0.30 (0.20 = 20% off)
+app_users,260000,Monthly active male app users who can get the coupon
+redemption_rate,,Redemptions per app user at full availability (Einlösequote); empty = reference line through past coupons
+units_per_redemption,,Units bought per redemption; empty = average of past coupons rounded to 0.1
+incremental_share,,Share of coupon units that are incremental; empty = reference line through past coupons
+pull_forward_share,,Share of incremental units pulled forward (the dip after the coupon); empty = average of past coupons
+rate_uncertainty,0.20,Uncertainty of the redemption rate used for the commit volume (0.20 = plus or minus 20%)
+target_fill_rate,,Target fill rate; empty = average of normal weeks rounded to 1 point
+lead_time_days,96,Days between the commit and the coupon start
+units_per_facing,6,Units one facing holds on the shelf (shelf check)
+delivery_days,Mon,Store delivery day (assumption): one delivery a week on Monday
+pallet_units,1200,Units per pallet
+test_price,,Regular shelf price of Deo Test Brand; empty = latest price in the data
+control_price,,Regular shelf price of Deo Control Brand; empty = latest price in the data
+market_avg_price,1.50,Average deo shelf price in the drugstore (shown for comparison; not used in the counterfactual)

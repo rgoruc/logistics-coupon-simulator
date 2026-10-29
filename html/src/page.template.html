@@ -1,0 +1,1854 @@
+<title>Logistics Coupon Simulator</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: one planning column on phones (coupon inputs, four answers, tabs); wider screens put the two forecast charts side by side. */
+:root {
+  --plane: #f4f3ef;
+  --surface: #fcfcfb;
+  --ink: #0b0b0b;
+  --ink-2: #52514e;
+  --muted: #898781;
+  --grid: #e1e0d9;
+  --axis: #c3c2b7;
+  --border: rgba(11, 11, 11, 0.10);
+  --accent: #2a78d6;
+  --accent-ink: #1c5cab;
+  --accent-wash: rgba(42, 120, 214, 0.10);
+  --s2: #eb6834;
+  --s3: #1baf7a;
+  --s4: #eda100;
+  --s5: #e87ba4;
+  --s6: #008300;
+  --s8: #e34948;
+  --band: rgba(137, 135, 129, 0.13);
+  --good: #0ca30c;
+  --good-ink: #006300;
+  --good-wash: rgba(12, 163, 12, 0.10);
+  --critical: #d03b3b;
+  --critical-ink: #b02a2a;
+  --critical-wash: rgba(208, 59, 59, 0.10);
+  --warning-wash: rgba(250, 178, 25, 0.16);
+  --total: #898781;
+  --font-ui: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-data: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  --radius: 10px;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --plane: #0d0d0d;
+    --surface: #1a1a19;
+    --ink: #f0efec;
+    --ink-2: #c3c2b7;
+    --muted: #898781;
+    --grid: #2c2c2a;
+    --axis: #383835;
+    --border: rgba(255, 255, 255, 0.10);
+    --accent: #3987e5;
+    --accent-ink: #86b6ef;
+    --accent-wash: rgba(57, 135, 229, 0.16);
+    --s2: #d95926;
+    --s3: #199e70;
+    --s4: #c98500;
+    --s5: #d55181;
+    --s6: #008300;
+    --s8: #e66767;
+    --band: rgba(137, 135, 129, 0.16);
+    --good: #0ca30c;
+    --good-ink: #0ca30c;
+    --good-wash: rgba(12, 163, 12, 0.16);
+    --critical: #d03b3b;
+    --critical-ink: #e66767;
+    --critical-wash: rgba(208, 59, 59, 0.18);
+    --warning-wash: rgba(250, 178, 25, 0.16);
+    --total: #898781;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --plane: #0d0d0d;
+  --surface: #1a1a19;
+  --ink: #f0efec;
+  --ink-2: #c3c2b7;
+  --muted: #898781;
+  --grid: #2c2c2a;
+  --axis: #383835;
+  --border: rgba(255, 255, 255, 0.10);
+  --accent: #3987e5;
+  --accent-ink: #86b6ef;
+  --accent-wash: rgba(57, 135, 229, 0.16);
+  --s2: #d95926;
+  --s3: #199e70;
+  --s4: #c98500;
+  --s5: #d55181;
+  --s6: #008300;
+  --s8: #e66767;
+  --band: rgba(137, 135, 129, 0.16);
+  --good: #0ca30c;
+  --good-ink: #0ca30c;
+  --good-wash: rgba(12, 163, 12, 0.16);
+  --critical: #d03b3b;
+  --critical-ink: #e66767;
+  --critical-wash: rgba(208, 59, 59, 0.18);
+  --warning-wash: rgba(250, 178, 25, 0.16);
+  --total: #898781;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body {
+  background: var(--plane);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 15px;
+  line-height: 1.5;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 20px 40px;
+}
+.page { max-width: 1080px; margin: 0 auto; display: grid; gap: 16px; }
+h1, h2, h3 { margin: 0; text-wrap: balance; }
+h1 { font-size: 1.75rem; line-height: 1.15; font-weight: 600; letter-spacing: -0.01em; }
+h2 { font-size: 1.05rem; font-weight: 600; }
+p { margin: 0; }
+.eyebrow { font-family: var(--font-data); font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+.lede { color: var(--ink-2); max-width: 62ch; }
+.head { display: grid; gap: 6px; }
+
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; display: grid; gap: 12px; min-width: 0; }
+.card-title { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.note { color: var(--ink-2); font-size: 0.9rem; }
+.small { font-size: 0.82rem; color: var(--muted); }
+.error { font-size: 0.82rem; color: var(--critical-ink); }
+
+/* Controls */
+.controls { gap: 16px; }
+.controls-grid { display: grid; gap: 16px; }
+.group { border-top: 1px solid var(--border); padding-top: 16px; }
+.field { display: grid; gap: 6px; min-width: 0; align-content: start; }
+.field-label { font-size: 0.82rem; font-weight: 500; color: var(--ink-2); }
+.seg { display: flex; gap: 4px; padding: 3px; background: var(--plane); border: 1px solid var(--border); border-radius: 9px; }
+.seg label { flex: 1 1 0; position: relative; min-width: 0; }
+.seg input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.seg span { display: grid; place-items: center; min-height: 44px; padding: 4px 2px; border-radius: 7px; font-weight: 500; font-variant-numeric: tabular-nums; color: var(--ink-2); text-align: center; line-height: 1.2; }
+.seg span small { display: block; font-size: 0.7rem; font-weight: 400; color: var(--muted); }
+.seg input:checked + span { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12); }
+.seg input:checked + span small { color: var(--ink-2); }
+.seg input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 1px; }
+.row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; align-items: end; }
+.row-3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; align-items: end; }
+.stepper { display: flex; align-items: center; gap: 4px; background: var(--plane); border: 1px solid var(--border); border-radius: 9px; padding: 3px; }
+.stepper button { width: 44px; height: 44px; border: 0; border-radius: 7px; background: var(--surface); color: var(--ink); font: 600 1.2rem/1 var(--font-ui); cursor: pointer; }
+.stepper button:disabled { opacity: 0.35; cursor: default; }
+.stepper output { flex: 1; text-align: center; font-weight: 600; font-variant-numeric: tabular-nums; }
+.switch { display: flex; align-items: center; gap: 10px; min-height: 44px; cursor: pointer; }
+.switch input { width: 20px; height: 20px; accent-color: var(--accent); margin: 0; }
+button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.reach { display: grid; gap: 16px; }
+.text-input, input[type="number"], select {
+  width: 100%; min-height: 44px; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border);
+  background: var(--plane); color: var(--ink); font: 500 1rem var(--font-ui); font-variant-numeric: tabular-nums;
+}
+.money { display: flex; align-items: center; gap: 4px; min-height: 44px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--border); background: var(--plane); }
+.money span { color: var(--ink-2); }
+.money input { border: 0; background: transparent; width: 100%; min-height: 42px; padding: 0; color: var(--ink); font: 500 1rem var(--font-ui); font-variant-numeric: tabular-nums; outline: none; }
+.money:focus-within { outline: 2px solid var(--accent); outline-offset: 1px; }
+.label-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.req { font-size: 0.7rem; font-weight: 600; letter-spacing: 0.02em; padding: 1px 8px; border-radius: 999px; background: var(--accent-wash); color: var(--accent-ink); }
+.rate-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.rate-box { display: inline-flex; align-items: center; gap: 4px; width: 132px; min-height: 48px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--plane); }
+.rate-box:focus-within { outline: 2px solid var(--accent); outline-offset: 1px; }
+.rate-box input { border: 0; background: transparent; width: 100%; min-height: 46px; padding: 0; color: var(--ink); font: 600 1.15rem var(--font-ui); font-variant-numeric: tabular-nums; outline: none; }
+.rate-box span { color: var(--ink-2); font-weight: 500; }
+.rate-field.is-missing .rate-box { border-color: var(--accent); background: var(--accent-wash); }
+.chip { min-height: 44px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--accent); background: transparent; color: var(--accent-ink); font: 500 0.9rem var(--font-ui); cursor: pointer; }
+.chip:active { background: var(--accent-wash); }
+.chip:disabled { cursor: default; }
+
+.days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.day { display: grid; gap: 2px; justify-items: center; }
+.day span { font-size: 0.72rem; color: var(--muted); }
+.day input { width: 100%; min-height: 40px; padding: 4px 2px; text-align: center; border-radius: 7px; border: 1px solid var(--border); background: var(--plane); color: var(--ink); font: 500 0.88rem var(--font-ui); font-variant-numeric: tabular-nums; }
+.day .closed { min-height: 40px; display: grid; place-items: center; font-size: 0.72rem; color: var(--muted); border: 1px dashed var(--axis); border-radius: 7px; width: 100%; }
+.day b { min-height: 40px; display: grid; place-items: center; width: 100%; font: 600 0.88rem var(--font-ui); font-variant-numeric: tabular-nums; color: var(--ink); }
+h3.mini { font-size: 0.9rem; font-weight: 600; margin-top: 16px; }
+.heat { display: grid; grid-template-columns: 30px repeat(12, minmax(0, 1fr)); gap: 2px; margin-top: 10px; }
+.heat .h-lab { font-size: 0.66rem; color: var(--muted); text-align: center; font-variant-numeric: tabular-nums; }
+.heat .h-row { font-size: 0.72rem; color: var(--ink-2); display: flex; align-items: center; }
+.heat button { min-height: 24px; border: 0; border-radius: 3px; padding: 0; cursor: pointer; }
+.heat button[aria-pressed="true"] { outline: 2px solid var(--ink); outline-offset: 1px; }
+.heat-scale { display: flex; align-items: center; gap: 8px; font-size: 0.72rem; color: var(--muted); margin-top: 10px; font-variant-numeric: tabular-nums; }
+.heat-scale i { flex: 0 0 120px; height: 8px; border-radius: 4px; }
+.heat-pick { margin-top: 8px; font-size: 0.82rem; color: var(--ink-2); min-height: 1.3em; }
+.day button { width: 100%; min-height: 40px; border-radius: 7px; border: 1px solid var(--border); background: var(--plane); color: var(--ink-2); font: 500 0.82rem var(--font-ui); cursor: pointer; }
+.day button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+details.assume { border-top: 1px solid var(--border); padding-top: 12px; }
+details.assume summary { cursor: pointer; font-weight: 500; color: var(--ink-2); padding: 8px 0; }
+.assume-list h3.mini { margin: 14px 0 0; font-size: 0.85rem; }
+.assume-list h3.mini:first-of-type { margin-top: 8px; }
+.assume-list ul { margin: 6px 0 0; padding-left: 18px; display: grid; gap: 4px; }
+.assume-list li { font-size: 0.85rem; color: var(--ink-2); max-width: 72ch; }
+details.data summary { cursor: pointer; color: var(--ink-2); font-size: 0.85rem; padding: 6px 0; }
+details.data[open] summary { margin-bottom: 8px; }
+.assume-grid { display: grid; gap: 18px; margin-top: 10px; }
+.assume-grid .row-2 { align-items: start; }
+.sub-head { border-top: 1px solid var(--grid); padding-top: 14px; }
+input[type="range"] { width: 100%; accent-color: var(--accent); }
+.range-head { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+.range-head output { font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+#holiday-table td:nth-child(2), #holiday-table th:nth-child(2) { white-space: normal; text-align: left; min-width: 120px; }
+.scenario { font-size: 0.9rem; color: var(--ink-2); }
+.scenario strong { color: var(--ink); font-weight: 600; }
+
+/* KPI tiles */
+.results { display: grid; gap: 10px; }
+.kpis { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.kpi { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; display: grid; gap: 2px; align-content: start; min-width: 0; }
+.kpi .k-label { font-size: 0.8rem; color: var(--ink-2); line-height: 1.3; }
+.kpi .k-value { font-size: 1.8rem; font-weight: 600; letter-spacing: -0.015em; line-height: 1.2; font-variant-numeric: tabular-nums; }
+.kpi .k-sub { font-size: 0.78rem; color: var(--muted); }
+.kpi.net { border-color: var(--accent); background: var(--accent-wash); }
+.kpi.empty-state { grid-column: 1 / -1; gap: 8px; border-style: dashed; }
+.kpi.empty-state p { color: var(--ink-2); font-size: 0.92rem; }
+.kpi.empty-state .chip { justify-self: start; }
+.takeaway { font-size: 0.95rem; color: var(--ink-2); max-width: 70ch; }
+/* a short line stays visible; the explanation folds under "How to read" */
+details.how { margin-top: 2px; }
+details.how summary { cursor: pointer; display: inline-block; list-style: none; color: var(--accent); font-size: 0.8rem; padding: 2px 0; min-height: 0; }
+details.how summary::-webkit-details-marker { display: none; }
+details.how summary::after { content: " ▸"; }
+details.how[open] summary::after { content: " ▾"; }
+details.how p { margin: 4px 0 0; }
+.takeaway strong { color: var(--ink); }
+.takeaway .tk-line { display: block; }
+.takeaway .tk-line + .tk-line { margin-top: 6px; }
+.takeaway .tk-label { font-family: var(--font-data); font-size: 0.72rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-right: 8px; }
+
+/* Tabs */
+.tabs-wrap { overflow-x: auto; scrollbar-width: none; }
+.tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); min-width: max-content; }
+.tabs button {
+  appearance: none; border: 0; background: none; color: var(--ink-2); font: 500 0.88rem var(--font-ui);
+  padding: 12px 6px 10px; min-height: 44px; cursor: pointer; border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap;
+}
+.tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--accent); }
+.panel { display: grid; gap: 16px; }
+.charts { display: grid; gap: 16px; }
+
+/* Charts */
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 0.8rem; color: var(--ink-2); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.key { width: 18px; height: 0; border-top: 2px solid var(--accent); display: inline-block; }
+.key.base { border-top: 2px dashed var(--muted); }
+.key.s2 { border-top-color: var(--s2); }
+.key.s3 { border-top-color: var(--s3); }
+.key.dot { width: 9px; height: 9px; border: 0; border-radius: 50%; background: var(--ink); }
+.key.sq { width: 12px; height: 12px; border: 0; border-radius: 2px; }
+.key.red { border-top-color: var(--s8); }
+.key.red.dash { border-top-style: dashed; }
+.key.ink { border-top-color: var(--ink); }
+.chart { position: relative; width: 100%; min-width: 0; touch-action: pan-y; }
+.chart svg { display: block; width: 100%; overflow: visible; }
+.chart text { font-family: var(--font-ui); }
+.placeholder { padding: 18px 12px; border: 1px dashed var(--axis); border-radius: 8px; color: var(--ink-2); font-size: 0.9rem; text-align: center; }
+.tip {
+  position: absolute; top: 4px; z-index: 2; pointer-events: none; min-width: 150px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.14); font-size: 0.8rem; display: grid; gap: 3px;
+}
+.tip .t-head { color: var(--ink-2); font-size: 0.75rem; }
+.tip .t-row { display: grid; grid-template-columns: 14px 1fr; align-items: center; gap: 6px; }
+.tip .t-row b { font-weight: 600; font-variant-numeric: tabular-nums; color: var(--ink); }
+.tip .t-row i { font-style: normal; color: var(--ink-2); }
+.tip .t-key { width: 12px; border-top: 2px solid var(--accent); }
+.tip .t-key.base { border-top-style: dashed; border-top-color: var(--muted); }
+.tip .t-key.dot { width: 8px; height: 8px; border: 0; border-radius: 50%; background: var(--ink); }
+.tip .t-key.sw { width: 10px; height: 10px; border: 0; border-radius: 2px; }
+
+/* Tables */
+.table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 8px; }
+table { border-collapse: collapse; width: 100%; font-size: 0.85rem; font-variant-numeric: tabular-nums; }
+th, td { padding: 8px 10px; text-align: right; white-space: nowrap; border-bottom: 1px solid var(--grid); background: var(--surface); }
+th { font-weight: 500; color: var(--ink-2); background: var(--plane); font-size: 0.78rem; white-space: normal; vertical-align: bottom; line-height: 1.3; }
+th:first-child, td:first-child { text-align: left; position: sticky; left: 0; z-index: 1; box-shadow: inset -1px 0 0 var(--grid); }
+tr:last-child td { border-bottom: 0; }
+table.compact th, table.compact td { padding: 8px 7px; }
+table.compact td:first-child { white-space: normal; }
+tr.is-coupon td { background: linear-gradient(var(--accent-wash), var(--accent-wash)), var(--surface); }
+tr.is-closed td { color: var(--muted); }
+.neg { color: var(--critical-ink); }
+.pos { color: var(--good-ink); }
+.dim { color: var(--muted); }
+.bar-cell { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+.bar-cell i { display: inline-block; height: 8px; border-radius: 0 4px 4px 0; background: var(--accent); }
+
+/* Status */
+.status { display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: start; padding: 12px; border-radius: 8px; }
+.status.bad { background: var(--critical-wash); }
+.status.ok { background: var(--good-wash); }
+.status.warn { background: var(--warning-wash); }
+.status.info { background: var(--accent-wash); }
+.icon { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: 0.8rem; color: #fff; }
+.bad .icon { background: var(--critical); }
+.ok .icon { background: var(--good); }
+.warn .icon { background: #fab219; color: #0b0b0b; }
+.info .icon { background: var(--accent); }
+.pill { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px; font-size: 0.75rem; font-weight: 600; white-space: nowrap; flex-shrink: 0; }
+.pill.ok { background: var(--good-wash); color: var(--good-ink); }
+.pill.bad { background: var(--critical-wash); color: var(--critical-ink); }
+.sku { display: grid; gap: 6px; padding: 12px 0; border-top: 1px solid var(--grid); }
+.sku:first-of-type { border-top: 0; padding-top: 0; }
+.sku-head { display: flex; justify-content: space-between; gap: 10px; align-items: start; }
+.sku-name { font-weight: 500; }
+.sku-facts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.fact { display: grid; }
+.fact b { font-weight: 600; font-variant-numeric: tabular-nums; }
+.fact span { font-size: 0.75rem; color: var(--muted); }
+.stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.stat { display: grid; gap: 2px; }
+.stat b { font-size: 1.1rem; font-weight: 600; }
+.stat span { font-size: 0.75rem; color: var(--muted); line-height: 1.3; }
+.method { display: grid; gap: 10px; padding-left: 18px; margin: 0; max-width: 72ch; }
+.foot { color: var(--muted); font-size: 0.8rem; max-width: 72ch; }
+
+@media (min-width: 720px) {
+  .kpis { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .controls-grid { grid-template-columns: 1fr 1fr; gap: 16px 24px; }
+  .reach { grid-template-columns: 1fr 1.3fr; gap: 16px 24px; }
+  .days { max-width: 460px; }
+}
+@media (min-width: 960px) {
+  .charts { grid-template-columns: 3fr 2fr; }
+  h1 { font-size: 2.1rem; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .tip { transition: opacity 120ms ease; }
+}
+
+.money.narrow { max-width: 160px; }
+.kpi .k-sub b { font-weight: 600; color: var(--ink); }
+.ci-legend .key.band { width: 14px; height: 10px; border: 0; border-radius: 2px; background: var(--accent); opacity: 0.25; }
+.mini-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 14px; margin: 6px 0 4px; }
+.mini-stats div { display: grid; gap: 2px; }
+.mini-stats b { font-size: 1.1rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+.mini-stats span { font-size: 0.78rem; color: var(--ink-2); }
+@media (min-width: 700px) { .mini-stats { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.ci-legend .key.band.muted { background: var(--muted); opacity: 0.3; }
+@media (max-width: 380px) { .tabs button { font-size: 0.82rem; padding: 12px 4px 10px; } }
+.card > * { min-width: 0; }
+@media (max-width: 400px) { table.compact { font-size: 0.8rem; } table.compact th, table.compact td { padding: 8px 5px; } }
+.wk-cell small { display: block; font-size: 0.72rem; color: var(--muted); white-space: nowrap; }
+#drivers-table td:first-child, #drivers-table th:first-child { min-width: 190px; }
+#drivers-table td:nth-child(2), #drivers-table th:nth-child(2) { min-width: 110px; white-space: nowrap; }
+#drivers-table td:last-child { min-width: 200px; text-align: left; white-space: normal; }
+#drivers-table td:first-child { white-space: normal; }
+@media (max-width: 480px) {
+  .kpi .k-value { font-size: 1.5rem; }
+  #drivers-table td:first-child, #drivers-table th:first-child { min-width: 128px; max-width: 128px; width: 128px; }
+  #drivers-table td:nth-child(2), #drivers-table th:nth-child(2) { min-width: 96px; text-align: left; }
+  #drivers-table td:last-child { min-width: 170px; }
+}
+.drv b { display: block; font-weight: 600; color: var(--ink); }
+.drv small { display: block; font-size: 0.74rem; color: var(--muted); font-weight: 400; }
+.drv.pos b { color: var(--good); }
+.drv.neg b { color: var(--critical); }
+</style>
+
+<div class="page">
+  <header class="head">
+    <p class="eyebrow">Drugstore app coupon · Deo Test Brand · fictional sales data</p>
+    <h1>Logistics Coupon Simulator</h1>
+    <p class="lede">What a coupon means for logistics before you launch it: the extra units, the volume to commit and by when, the pallets per week and the shelf. Measured on what past coupons really added, against normal demand built from its drivers (season, holidays, weather, prices). Fictional data, one region with 450 stores.</p>
+  </header>
+
+  <div class="results" aria-label="Results">
+    <p class="scenario" id="scenario-line"></p>
+    <section class="kpis" id="kpis"></section>
+    <p class="takeaway" id="takeaway"></p>
+  </div>
+
+  <section class="card controls" aria-label="Coupon">
+    <div class="controls-grid">
+      <div class="field">
+        <span class="field-label" id="discount-label">Discount on all Deo Test Brand deos</span>
+        <div class="seg" role="radiogroup" aria-labelledby="discount-label" id="discount-group"></div>
+      </div>
+      <div class="field">
+        <label class="field-label" for="price">Deo Test Brand shelf price</label>
+        <div class="money narrow"><span aria-hidden="true">€</span><input type="text" id="price" inputmode="decimal" autocomplete="off"></div>
+        <p class="small" id="price-line"></p>
+      </div>
+    </div>
+
+    <div class="controls-grid group">
+      <div class="field">
+        <span class="field-label" id="length-label">Coupon length (Monday to Saturday)</span>
+        <div class="seg" role="radiogroup" aria-labelledby="length-label" id="length-group"></div>
+        <p class="small" id="length-hint"></p>
+      </div>
+      <div class="field">
+        <label class="field-label" for="start-week">Start week (2026)</label>
+        <select id="start-week"></select>
+        <p class="small" id="start-hint"></p>
+      </div>
+    </div>
+
+    <div class="reach group">
+      <div class="field">
+        <label class="field-label" for="mau">Drugstore app: monthly active male users</label>
+        <input class="text-input" type="text" id="mau" inputmode="numeric" autocomplete="off" value="260,000">
+        <p class="small">Region with 450 stores, latest month. The redemption rate applies to these users.</p>
+        <p class="error" id="mau-error" hidden>Enter a number of users above zero.</p>
+      </div>
+      <div class="field rate-field" id="rate-field">
+        <div class="label-row">
+          <label class="field-label" for="rate">Redemption rate (Einlösequote) for the whole coupon at full availability, your estimate</label>
+          <span class="req" id="rate-req">Required</span>
+        </div>
+        <div class="rate-row">
+          <div class="rate-box"><input type="text" id="rate" inputmode="decimal" autocomplete="off" placeholder="e.g. 11.7" aria-describedby="rate-hint"><span aria-hidden="true">%</span></div>
+          <button type="button" class="chip" id="use-ref">Use reference</button>
+        </div>
+        <p class="small" id="rate-hint"></p>
+        <p class="error" id="rate-error" hidden>Enter a percentage between 0 and 100, for example 11.7.</p>
+      </div>
+    </div>
+
+    <details class="assume" id="assumptions">
+      <summary>Assumptions</summary>
+      <div class="assume-grid">
+        <div class="assume-list" id="assume-list"></div>
+        <p class="small" id="assume-note"></p>
+        <div class="row-2">
+          <div class="field">
+            <label class="field-label" for="upr">Units per redemption</label>
+            <input class="text-input" type="text" id="upr" inputmode="decimal" autocomplete="off">
+            <p class="small" id="upr-hint"></p>
+          </div>
+          <p class="small">The coupon allows any quantity, so one redemption can cover several units.</p>
+        </div>
+        <div class="field">
+          <div class="range-head">
+            <label class="field-label" for="inc">Incremental share of the coupon units</label>
+            <output id="inc-value" for="inc"></output>
+          </div>
+          <input type="range" id="inc" min="0" max="100" step="1">
+          <p class="small" id="inc-hint"></p>
+        </div>
+        <div class="field">
+          <div class="range-head">
+            <label class="field-label" for="pull">Pulled forward from later weeks (share of the incremental units)</label>
+            <output id="pull-value" for="pull"></output>
+          </div>
+          <input type="range" id="pull" min="0" max="60" step="1">
+          <p class="small" id="pull-hint"></p>
+        </div>
+        <div class="field">
+          <div class="range-head">
+            <label class="field-label" for="unc">Uncertainty of the redemption rate (±, one standard deviation)</label>
+            <output id="unc-value" for="unc"></output>
+          </div>
+          <input type="range" id="unc" min="0" max="50" step="5">
+          <p class="small">Used for the volume to commit. 20% means 11.7% could as well be 9.4% or 14.0%.</p>
+        </div>
+        <div class="field">
+          <div class="range-head">
+            <label class="field-label" for="fill">Target fill rate</label>
+            <output id="fill-value" for="fill"></output>
+          </div>
+          <input type="range" id="fill" min="85" max="100" step="1">
+          <p class="small" id="fill-hint"></p>
+        </div>
+        <div class="field">
+          <span class="field-label" id="weather-label">Weather in the plan weeks (43 to 52)</span>
+          <div class="seg" role="radiogroup" aria-labelledby="weather-label" id="weather-group"></div>
+          <p class="small" id="weather-hint"></p>
+        </div>
+        <div class="field sub-head">
+          <span class="field-label">Store delivery</span>
+          <p class="small" id="delivery-hint"></p>
+        </div>
+        <div class="row-2">
+          <div class="field">
+            <label class="field-label" for="lead">Lead time (days)</label>
+            <input type="number" id="lead" min="0" max="365" step="1" value="96" inputmode="numeric">
+          </div>
+          <div class="field">
+            <label class="field-label" for="depth">Units per facing</label>
+            <input type="number" id="depth" min="1" max="20" step="1" value="6" inputmode="numeric">
+          </div>
+        </div>
+        <p class="small">Supply chain needs the volume 96 days before the start. Shelf numbers describe one high-volume store.</p>
+      </div>
+    </details>
+  </section>
+
+  <div class="tabs-wrap">
+    <div class="tabs" role="tablist" aria-label="Views">
+      <button role="tab" id="tab-forecast" aria-controls="panel-forecast" data-tab="forecast">Forecast</button>
+      <button role="tab" id="tab-supply-chain" aria-controls="panel-supply-chain" data-tab="supply-chain">Logistics</button>
+      <button role="tab" id="tab-last-coupon" aria-controls="panel-last-coupon" data-tab="last-coupon">Last coupon</button>
+      <button role="tab" id="tab-method" aria-controls="panel-method" data-tab="method">Method</button>
+    </div>
+  </div>
+
+  <section class="panel" role="tabpanel" id="panel-forecast" aria-labelledby="tab-forecast">
+    <div class="charts">
+      <div class="card">
+        <div class="card-title"><h2>Deo Test Brand 2026, calendar weeks 1 to 52</h2><span class="small">Weekly · tap or hover for values</span></div>
+        <div class="legend" id="paint-legend"></div>
+        <div class="chart" id="paint-chart" tabindex="0" role="img" aria-label="Weekly Deo Test Brand demand in 2026: predicted demand without the coupon, with the coupon you plan, and actual demand up to the end of the data"></div>
+        <div class="small" id="paint-note"></div>
+        <details class="data"><summary>Chart data, all weeks</summary><div class="table-wrap"><table id="paint-table"></table></div></details>
+      </div>
+      <div class="card">
+        <div class="card-title"><h2>From coupon units to incremental units</h2></div>
+        <div class="chart" id="bridge-chart" tabindex="0" role="img" aria-label="Bridge from units sold with the coupon to net incremental units"></div>
+        <p class="small" id="bridge-note"></p>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title"><h2>What drives normal demand</h2><span class="small" id="drivers-sub"></span></div>
+      <div class="note" id="drivers-intro"></div>
+      <div class="table-wrap"><table id="drivers-table" class="compact"></table></div>
+    </div>
+    <div class="card">
+      <div class="card-title"><h2>Weekly plan</h2><span class="small">Units, region with 450 stores</span></div>
+      <div class="table-wrap"><table id="plan-table"></table></div>
+    </div>
+  </section>
+
+  <section class="panel" role="tabpanel" id="panel-last-coupon" aria-labelledby="tab-last-coupon" hidden>
+    <div class="card">
+      <div class="card-title"><h2>2025 coupon: what it really added</h2><span class="small">Calendar weeks 1 to 52, weekly</span></div>
+      <div class="mini-stats" id="ci-stats"></div>
+      <div class="legend ci-legend">
+        <span><i class="key"></i>Actual demand</span>
+        <span><i class="key base"></i>Counterfactual</span>
+        <span><i class="key band muted"></i>95% interval of the counterfactual</span>
+      </div>
+      <div class="chart" id="ci-chart" tabindex="0" role="img" aria-label="Deo Test Brand weekly demand in 2025 by calendar week against the counterfactual from the control brand, with the coupon in weeks 43 to 47"></div>
+      <div class="small" id="ci-note"></div>
+    </div>
+    <div class="card">
+      <div class="card-title"><h2>Incremental units, adding up</h2><span class="small">From the first coupon day</span></div>
+      <div class="legend ci-legend">
+        <span><i class="key"></i>Cumulative incremental units</span>
+        <span><i class="key band"></i>95% interval</span>
+      </div>
+      <div class="chart" id="cum-chart" tabindex="0" role="img" aria-label="Cumulative incremental Deo Test Brand units from the first coupon day to three weeks after the coupon"></div>
+      <div class="small" id="cum-note"></div>
+    </div>
+    <div class="card">
+      <h2>The control brand as a cross-check</h2>
+      <div class="stats" id="price-stats"></div>
+      <div class="note" id="price-note"></div>
+    </div>
+    <div class="card">
+      <div class="card-title"><h2>Baseline: the rule, last 6 weeks</h2><span class="small" id="base-sub"></span></div>
+      <div class="note" id="base-intro"></div>
+      <h3 class="mini" id="base-ex-title"></h3>
+      <div class="table-wrap"><table id="base-ex-table" class="compact"></table></div>
+      <div class="small" id="base-ex-note"></div>
+      <h3 class="mini">Baseline units per hour</h3>
+      <div class="heat" id="heat" role="group" aria-label="Baseline units per hour by weekday and hour"></div>
+      <div class="heat-scale" id="heat-scale"></div>
+      <p class="heat-pick" id="heat-pick" aria-live="polite"></p>
+      <div class="small" id="base-note"></div>
+      <details class="data"><summary>Baseline data, units per hour</summary><div class="table-wrap"><table id="heat-table" class="compact"></table></div></details>
+    </div>
+    <div class="card">
+      <div class="card-title"><h2>2025 coupon by hour</h2><span class="small">Average full coupon day</span></div>
+      <div class="legend">
+        <span><i class="key base"></i>Counterfactual</span>
+        <span><i class="key"></i>Actual demand</span>
+      </div>
+      <div class="chart" id="hours-chart" tabindex="0" role="img" aria-label="Deo Test Brand demand by hour on an average coupon day in 2025 against the counterfactual"></div>
+      <div class="small" id="hours-note"></div>
+    </div>
+    <div class="card">
+      <h2>Past Deo Test Brand coupons</h2>
+      <div class="small" id="past-note"></div>
+      <div class="table-wrap"><table id="past-table" class="compact"></table></div>
+    </div>
+  </section>
+
+  <section class="panel" role="tabpanel" id="panel-supply-chain" aria-labelledby="tab-supply-chain" hidden>
+    <div class="card">
+      <h2>When does logistics need to know?</h2>
+      <div id="deadline"></div>
+      <div class="note" id="deadline-note"></div>
+    </div>
+    <div class="card">
+      <div class="card-title"><h2>Volume to commit for the coupon weeks</h2><span class="small" id="commit-sub"></span></div>
+      <div class="stats" id="commit-stats"></div>
+      <div class="note" id="commit-note"></div>
+    </div>
+    <div class="card">
+      <div class="card-title"><h2>Fill rate: what empty shelves cost</h2><span class="small" id="fill-sub"></span></div>
+      <div class="stats" id="fill-stats"></div>
+      <div class="note" id="fill-note"></div>
+    </div>
+    <div class="card">
+      <div class="card-title"><h2>Distribution centre: pallets per week</h2><span class="small">Demand, 1,200 units per pallet</span></div>
+      <p class="note" id="pallet-note"></p>
+      <div class="table-wrap"><table id="pallet-table"></table></div>
+      <div class="status info"><span class="icon" aria-hidden="true">i</span><p id="lastyear-note"></p></div>
+    </div>
+    <div class="card">
+      <div class="card-title"><h2>Daily plan: Deo Test Brand</h2><span class="small">Sundays closed</span></div>
+      <div class="field">
+        <label class="field-label" for="daily-week">Week</label>
+        <select id="daily-week"></select>
+      </div>
+      <div class="table-wrap"><table id="daily-table" class="compact"></table></div>
+      <div class="small" id="daily-note"></div>
+      <div id="daily-actual" hidden>
+        <div class="field sub-head"><span class="field-label" id="daily-actual-label">Actual against the model</span></div>
+        <div class="table-wrap"><table id="daily-actual-table" class="compact"></table></div>
+      </div>
+      <div class="field sub-head"><span class="field-label" id="daily-drivers-label">The drivers of each day</span></div>
+      <div class="table-wrap"><table id="daily-drivers-table" class="compact"></table></div>
+      <div class="small" id="daily-drivers-note"></div>
+      <div class="field sub-head">
+        <span class="field-label" id="hour-label">Hourly plan, 08:00 to 20:00</span>
+        <div class="seg" role="radiogroup" aria-label="Day of the hourly plan" id="hour-day"></div>
+      </div>
+      <div class="table-wrap"><table id="hour-table" class="compact"></table></div>
+      <div class="small" id="hour-note"></div>
+    </div>
+    <div class="card">
+      <div class="card-title"><h2>Shelf check, high-volume store</h2><span class="small" id="shelf-sub"></span></div>
+      <div id="shelf-summary"></div>
+      <div id="shelf-list"></div>
+    </div>
+  </section>
+
+  <section class="panel" role="tabpanel" id="panel-method" aria-labelledby="tab-method" hidden>
+    <div class="card">
+      <h2>How the numbers are made</h2>
+      <ul class="method" id="method-list"></ul>
+    </div>
+  </section>
+
+  <p class="foot">Drugstore, Deo Test Brand and Deo Control Brand are placeholder names. All assumptions are listed under Assumptions.</p>
+</div>
+
+<script>
+/*__MODEL__*/
+</script>
+<script>
+(() => {
+  const M = Model;
+  const cal = M.calibrate();
+  const DAYS = M.DAYS, B = M.NAME;
+  const $ = (id) => document.getElementById(id);
+  const nf = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
+  const nf1 = new Intl.NumberFormat("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  const nf2 = new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const nfu = new Intl.NumberFormat("en-US", { minimumFractionDigits: 1, maximumFractionDigits: 2 });
+  const eur = (v) => "€" + nf2.format(v);
+  const MINUS = "−";
+  const DASH = "—";
+  const r100 = (v) => Math.round(v / 100) * 100;
+  const signed = (v) => (v > 0 ? "+" : v < 0 ? MINUS : "") + nf.format(Math.abs(v));
+  const hundreds = (v) => signed(r100(v));
+  const plain100 = (v) => nf.format(r100(v));
+  const pct0 = (v) => Math.round(v * 100) + "%";
+  const pct1 = (v) => nf1.format(v * 100) + "%";
+  const pctSigned = (v) => (v > 0.0005 ? "+" : v < -0.0005 ? MINUS : "") + Math.abs(v * 100).toFixed(1) + "%";
+  const degSigned = (v) => (v > 0 ? "+" : v < 0 ? MINUS : "") + nf1.format(Math.abs(v)) + " °C";
+  const fmtDate = (d, withYear = true) => d.toLocaleDateString("en-GB", { day: "numeric", month: "short", ...(withYear ? { year: "numeric" } : {}), timeZone: "UTC" });
+  const kfmt = (v) => (v === 0 ? "0" : nf.format(v / 1000) + "K");
+  const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
+  const svgEl = (tag, attrs) => { const n = document.createElementNS("http://www.w3.org/2000/svg", tag); for (const k in attrs) n.setAttribute(k, attrs[k]); return n; };
+  const HALO = { stroke: "var(--surface)", "stroke-width": 4, "paint-order": "stroke", "stroke-linejoin": "round" };
+  const sum = (a) => a.reduce((x, y) => x + y, 0);
+  const parseNum = (s) => {
+    const t = String(s).replace(/[%€]/g, "").replace(/\s/g, "").replace(",", ".");
+    if (t === "") return null;
+    const v = Number(t);
+    return Number.isFinite(v) ? v : NaN;
+  };
+
+  function buildSeg(groupId, name, options, current, onPick) {
+    const g = $(groupId);
+    g.replaceChildren();
+    for (const o of options) {
+      const lab = el("label");
+      const inp = el("input");
+      inp.type = "radio"; inp.name = name; inp.value = String(o.value); inp.id = `${name}-${o.value}`;
+      inp.checked = o.value === current;
+      inp.addEventListener("change", () => onPick(o.value));
+      const span = el("span", null, o.label);
+      if (o.sub) span.append(el("small", null, o.sub));
+      lab.append(inp, span);
+      g.append(lab);
+    }
+  }
+
+  /* ---------- scales ---------- */
+  function niceScale(lo, hi, maxTicks = 6) {
+    const span = hi - lo || 1;
+    const mag = 10 ** Math.floor(Math.log10(span / maxTicks));
+    const step = [1, 2, 2.5, 5, 10].map((m) => m * mag).find((s) => span / s <= maxTicks) || 10 * mag;
+    return { lo: Math.floor(lo / step + 1e-9) * step, hi: Math.ceil(hi / step - 1e-9) * step, step };
+  }
+
+  /* ---------- line chart ---------- */
+  function lineChart(host, cfg) {
+    if (!host.clientWidth) return;
+    const width = Math.max(260, host.clientWidth);
+    const H = width < 480 ? 230 : 270;
+    const m = { l: 40, r: 14, t: 26, b: 26 };
+    const weeks = cfg.weeks;
+    const all = cfg.series.flatMap((s) => (s.kind === "range" ? [...s.lo, ...s.hi] : s.values).filter((v) => v != null));
+    const sc = cfg.zero ? niceScale(Math.min(0, ...all), Math.max(...all) * 1.06) : niceScale(Math.min(...all) - (cfg.pad || 0), Math.max(...all) + (cfg.pad || 0));
+    const tickFmt = cfg.tickFmt || kfmt;
+    const valFmt = cfg.valFmt || ((v) => nf.format(Math.round(v)));
+    const x = (w) => m.l + ((w - weeks[0]) / (weeks[weeks.length - 1] - weeks[0])) * (width - m.l - m.r);
+    const y = (v) => m.t + (1 - (v - sc.lo) / (sc.hi - sc.lo)) * (H - m.t - m.b);
+    const svg = svgEl("svg", { viewBox: `0 0 ${width} ${H}`, height: H, "aria-hidden": "true" });
+    const step = (width - m.l - m.r) / (weeks.length - 1);
+    if (cfg.band) {
+      const x0 = x(cfg.band[0]) - step / 2, x1 = x(cfg.band[1]) + step / 2;
+      svg.append(svgEl("rect", { x: x0, y: m.t, width: x1 - x0, height: H - m.t - m.b, fill: "var(--band)" }));
+      const t = svgEl("text", { x: x0 + 4, y: m.t - 8, "font-size": 11, fill: "var(--ink-2)" });
+      t.textContent = cfg.bandLabel || "Coupon";
+      svg.append(t);
+    }
+    for (let v = sc.lo; v <= sc.hi + sc.step / 1000; v += sc.step) {
+      svg.append(svgEl("line", { x1: m.l, x2: width - m.r, y1: y(v), y2: y(v), stroke: Math.abs(v) < 1e-9 ? "var(--axis)" : "var(--grid)", "stroke-width": 1 }));
+      const t = svgEl("text", { x: m.l - 6, y: y(v) + 4, "text-anchor": "end", "font-size": 11, fill: "var(--muted)", style: "font-variant-numeric: tabular-nums" });
+      t.textContent = tickFmt(v);
+      svg.append(t);
+    }
+    const every = [1, 2, 4, 5, 10, 13].find((k) => k * step >= 26) || 13;
+    weeks.forEach((w, i) => {
+      const show = cfg.showTick ? cfg.showTick(w, i) : every <= 2 ? i % every === 0 : w % every === 0 || i === 0;
+      if (!show) return;
+      const t = svgEl("text", { x: x(w), y: H - 8, "text-anchor": "middle", "font-size": 11, fill: "var(--muted)" });
+      t.textContent = cfg.xTick ? cfg.xTick(w) : String(w);
+      svg.append(t);
+    });
+    for (const s of cfg.series) {
+      if (s.kind === "range") {
+        const ok = weeks.map((w, i) => i).filter((i) => s.lo[i] != null && s.hi[i] != null);
+        const pts = [...ok.map((i) => [x(weeks[i]), y(s.hi[i])]), ...ok.map((i) => [x(weeks[i]), y(s.lo[i])]).reverse()];
+        svg.append(svgEl("polygon", { points: pts.map((q) => q[0].toFixed(1) + "," + q[1].toFixed(1)).join(" "), fill: s.color, "fill-opacity": 0.22 }));
+        continue;
+      }
+      if (s.kind === "dots") {
+        weeks.forEach((w, i) => {
+          const v = s.values[i];
+          if (v == null) return;
+          svg.append(svgEl("circle", { cx: x(w), cy: y(v), r: 4.5, fill: s.color, stroke: "var(--surface)", "stroke-width": 2 }));
+        });
+        continue;
+      }
+      let d = "";
+      weeks.forEach((w, i) => { const v = s.values[i]; if (v == null) return; d += (d ? "L" : "M") + x(w).toFixed(1) + "," + y(v).toFixed(1); });
+      svg.append(svgEl("path", { d, fill: "none", stroke: s.color, "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round", ...(s.dash ? { "stroke-dasharray": "5 4" } : {}) }));
+    }
+    const main = cfg.series.find((s) => s.emphasis);
+    if (main && cfg.labels !== false) {
+      const idx = main.values.map((v, i) => [v, i]).filter(([v]) => v != null);
+      const hi = idx.reduce((a, b) => (b[0] > a[0] ? b : a));
+      const after = idx.filter(([, i]) => weeks[i] > weeks[hi[1]]);
+      const marks = [hi];
+      if (cfg.labelLow && after.length) marks.push(after.reduce((a, b) => (b[0] < a[0] ? b : a)));
+      for (const [v, i] of marks) {
+        svg.append(svgEl("circle", { cx: x(weeks[i]), cy: y(v), r: 4.5, fill: main.color, stroke: "var(--surface)", "stroke-width": 2 }));
+        const right = x(weeks[i]) < width - 70;
+        const above = v === hi[0];
+        const t = svgEl("text", { x: x(weeks[i]) + (right ? 8 : -8), y: y(v) + (above ? -6 : 16), "text-anchor": right ? "start" : "end", "font-size": 12, "font-weight": 600, fill: "var(--ink)", ...HALO });
+        t.textContent = valFmt(v);
+        svg.append(t);
+      }
+    }
+    const cross = svgEl("line", { y1: m.t, y2: H - m.b, stroke: "var(--ink-2)", "stroke-width": 1, opacity: 0 });
+    svg.append(cross);
+    const hit = svgEl("rect", { x: m.l - step / 2, y: 0, width: width - m.l - m.r + step, height: H, fill: "transparent" });
+    svg.append(hit);
+    host.replaceChildren(svg);
+    const tip = el("div", "tip");
+    tip.hidden = true;
+    host.append(tip);
+    let cur = null;
+    const show = (i) => {
+      cur = Math.max(0, Math.min(weeks.length - 1, i));
+      const w = weeks[cur];
+      cross.setAttribute("x1", x(w)); cross.setAttribute("x2", x(w)); cross.setAttribute("opacity", 1);
+      const date = cfg.year ? ` · ${fmtDate(M.isoMonday(cfg.year, w), false)}` : "";
+      tip.replaceChildren(el("div", "t-head", cfg.head ? cfg.head(w) : `Week ${w}${date}${cfg.band && w >= cfg.band[0] && w <= cfg.band[1] ? " · " + (cfg.bandLabel || "coupon").toLowerCase() : ""}`));
+      for (const s of cfg.series) {
+        if (s.kind === "range") {
+          if (s.lo[cur] == null) continue;
+          const row = el("div", "t-row");
+          const key = el("span", "t-key sw");
+          key.style.background = s.color; key.style.opacity = "0.4";
+          const txt = el("span");
+          txt.append(el("b", null, `${valFmt(s.lo[cur])}–${valFmt(s.hi[cur])}`), document.createTextNode(" "), el("i", null, s.short));
+          row.append(key, txt);
+          tip.append(row);
+          continue;
+        }
+        const v = s.values[cur];
+        if (v == null) continue;
+        const row = el("div", "t-row");
+        const key = el("span", "t-key" + (s.dash ? " base" : s.kind === "dots" ? " dot" : ""));
+        if (!s.dash && s.kind !== "dots") key.style.borderTopColor = s.color;
+        if (s.kind === "dots") key.style.background = s.color;
+        row.append(key);
+        const txt = el("span");
+        txt.append(el("b", null, valFmt(v)), document.createTextNode(" "), el("i", null, s.short));
+        row.append(txt);
+        tip.append(row);
+      }
+      tip.hidden = false;
+      const tw = tip.offsetWidth;
+      let left = x(w) + 10;
+      if (left + tw > width) left = x(w) - tw - 10;
+      tip.style.left = Math.max(0, left) + "px";
+    };
+    const hide = () => { cross.setAttribute("opacity", 0); tip.hidden = true; cur = null; };
+    const pick = (ev) => {
+      const r = svg.getBoundingClientRect();
+      const px = ((ev.clientX - r.left) / r.width) * width;
+      show(Math.round((px - m.l) / step));
+    };
+    hit.addEventListener("pointermove", pick);
+    hit.addEventListener("pointerdown", pick);
+    hit.addEventListener("pointerleave", (ev) => { if (ev.pointerType === "mouse") hide(); });
+    host.onkeydown = (ev) => {
+      if (ev.key === "ArrowRight" || ev.key === "ArrowLeft") {
+        ev.preventDefault();
+        show(cur == null ? 0 : cur + (ev.key === "ArrowRight" ? 1 : -1));
+      } else if (ev.key === "Escape") hide();
+    };
+    host.onblur = hide;
+  }
+
+  /* ---------- bridge chart (horizontal waterfall with totals) ---------- */
+  function bridge(host, rows) {
+    if (!host.clientWidth) return;
+    const width = Math.max(260, host.clientWidth);
+    const rowH = 46, barH = 18, padR = 64;
+    let run = 0;
+    const segs = rows.map((s) => {
+      if (s.kind === "total") { run = s.value; return { ...s, a: 0, b: s.value }; }
+      const a = run; run += s.value; return { ...s, a, b: run };
+    });
+    const max = Math.max(...segs.map((s) => Math.max(s.a, s.b)));
+    const x = (v) => (v / max) * (width - padR);
+    const H = rowH * segs.length;
+    const colorOf = (s) => (s.kind === "total" ? "var(--total)" : s.value >= 0 ? "var(--good)" : "var(--critical)");
+    const svg = svgEl("svg", { viewBox: `0 0 ${width} ${H}`, height: H, "aria-hidden": "true" });
+    const bars = [], labels = [];
+    segs.forEach((s, i) => {
+      const top = i * rowH;
+      const lo = Math.min(s.a, s.b), hi = Math.max(s.a, s.b);
+      const lab = svgEl("text", { x: 0, y: top + 13, "font-size": 12, fill: "var(--ink-2)", "font-weight": s.strong ? 600 : 400 });
+      lab.textContent = s.label;
+      svg.append(lab);
+      labels.push(lab);
+      const bar = svgEl("rect", { x: x(lo), y: top + 20, width: Math.max(2, x(hi) - x(lo)), height: barH, rx: 4, fill: colorOf(s) });
+      svg.append(bar);
+      bars.push(bar);
+      if (i < segs.length - 1) svg.append(svgEl("line", { x1: x(s.b), x2: x(s.b), y1: top + 20 + barH, y2: top + rowH + 20, stroke: "var(--axis)", "stroke-width": 1 }));
+      const val = svgEl("text", { x: x(hi) + 6, y: top + 20 + barH - 4, "font-size": 12, "font-weight": 600, fill: "var(--ink)", style: "font-variant-numeric: tabular-nums", ...HALO });
+      val.textContent = s.kind === "total" ? plain100(s.value) : hundreds(s.value);
+      svg.append(val);
+    });
+    const hits = segs.map((s, i) => svgEl("rect", { x: 0, y: i * rowH, width, height: rowH, fill: "transparent" }));
+    svg.append(...hits);
+    host.replaceChildren(svg);
+    labels.forEach((lab) => {
+      const bb = lab.getBBox();
+      if (bb.width) lab.parentNode.insertBefore(svgEl("rect", { x: bb.x - 3, y: bb.y - 1, width: bb.width + 6, height: bb.height + 2, fill: "var(--surface)" }), lab);
+    });
+    const tip = el("div", "tip");
+    tip.hidden = true;
+    host.append(tip);
+    let cur = null;
+    const show = (i) => {
+      cur = Math.max(0, Math.min(segs.length - 1, i));
+      const s = segs[cur];
+      bars.forEach((b, j) => { b.style.filter = j === cur ? "brightness(1.15)" : ""; });
+      const row = el("div", "t-row");
+      const key = el("span", "t-key sw");
+      key.style.background = colorOf(s);
+      const txt = el("span");
+      txt.append(el("b", null, s.kind === "total" ? nf.format(Math.round(s.value)) : signed(Math.round(s.value))), document.createTextNode(" "), el("i", null, "units"));
+      row.append(key, txt);
+      tip.replaceChildren(el("div", "t-head", s.name), row, el("div", "t-head", s.tip));
+      tip.hidden = false;
+      const tw = tip.offsetWidth, th = tip.offsetHeight;
+      let top = cur * rowH + rowH - 4;
+      if (top + th > H) top = cur * rowH + 16 - th;
+      tip.style.top = top + "px";
+      tip.style.left = Math.max(0, Math.min(width - tw, x(Math.min(s.a, s.b)))) + "px";
+    };
+    const hide = () => { bars.forEach((b) => { b.style.filter = ""; }); tip.hidden = true; cur = null; };
+    hits.forEach((h, i) => {
+      h.addEventListener("pointerdown", () => show(i));
+      h.addEventListener("pointermove", () => { if (cur !== i) show(i); });
+    });
+    svg.addEventListener("pointerleave", (ev) => { if (ev.pointerType === "mouse") hide(); });
+    host.onkeydown = (ev) => {
+      if (["ArrowDown", "ArrowUp", "ArrowRight", "ArrowLeft"].includes(ev.key)) {
+        ev.preventDefault();
+        const fwd = ev.key === "ArrowDown" || ev.key === "ArrowRight";
+        show(cur == null ? 0 : cur + (fwd ? 1 : -1));
+      } else if (ev.key === "Escape") hide();
+    };
+    host.onblur = hide;
+  }
+
+  /* ---------- small builders ---------- */
+  function table(id, head, rows, rowClass) {
+    const t = $(id);
+    t.replaceChildren();
+    const thead = el("thead"), tr = el("tr");
+    head.forEach((h) => tr.append(el("th", null, h)));
+    thead.append(tr);
+    const tb = el("tbody");
+    rows.forEach((r, i) => {
+      const row = el("tr", rowClass ? rowClass(i) : null);
+      r.forEach((c) => {
+        const td = el("td");
+        if (c instanceof Node) td.append(c);
+        else if (c && typeof c === "object") { td.textContent = c.text; if (c.cls) td.className = c.cls; }
+        else td.textContent = c;
+        row.append(td);
+      });
+      tb.append(row);
+    });
+    t.append(thead, tb);
+  }
+  const delta = (v) => ({ text: signed(Math.round(v)), cls: Math.round(v) > 0 ? "pos" : Math.round(v) < 0 ? "neg" : "" });
+  const blank = { text: DASH, cls: "dim" };
+  // A short line stays visible; the explanation folds under "How to read" (the fold keeps its state across re-renders).
+  function note(id, short, long) {
+    const host = $(id);
+    host.replaceChildren(document.createTextNode(short));
+    if (!long) return;
+    const d = el("details", "how");
+    d.open = host.dataset.open === "1";
+    d.append(el("summary", null, "How to read"), el("p", null, long));
+    d.addEventListener("toggle", () => { host.dataset.open = d.open ? "1" : "0"; });
+    host.append(d);
+  }
+  function kpiTiles(host, tiles) {
+    host.replaceChildren(...tiles.map((t) => {
+      const k = el("div", "kpi" + (t.net ? " net" : ""));
+      k.append(el("span", "k-label", t.label), el("span", "k-value", t.value), el("span", "k-sub", t.sub));
+      return k;
+    }));
+  }
+  function status(host, kind, iconText, text) {
+    const box = el("div", "status " + kind);
+    const ic = el("span", "icon", iconText);
+    ic.setAttribute("aria-hidden", "true");
+    box.append(ic, el("p", null, text));
+    host.replaceChildren(box);
+  }
+  function stats(host, items) {
+    host.replaceChildren(...items.map(([v, l]) => { const s = el("div", "stat"); s.append(el("b", null, v), el("span", null, l)); return s; }));
+  }
+
+
+  function paintingChart(host, rows) {
+    if (!host.clientWidth) return;
+    const width = Math.max(260, host.clientWidth);
+    const H = width < 480 ? 280 : 320;
+    const m = { l: 40, r: 10, t: 12, b: 26 };
+    const n = rows.length;
+    const { top, sales: salesLine, sc } = paintScale(rows);
+    const x = (i) => m.l + (i / (n - 1)) * (width - m.l - m.r);
+    const y = (v) => m.t + (1 - (Math.max(sc.lo, v) - sc.lo) / (sc.hi - sc.lo)) * (H - m.t - m.b);
+    const svg = svgEl("svg", { viewBox: `0 0 ${width} ${H}`, height: H, "aria-hidden": "true" });
+    const defs = svgEl("defs", {});
+    for (const L of LOSSES) {
+      const pat = svgEl("pattern", { id: `hatch-${L.key}`, patternUnits: "userSpaceOnUse", width: 6, height: 6, patternTransform: "rotate(45)" });
+      pat.append(svgEl("rect", { width: 6, height: 6, fill: "var(--surface)" }), svgEl("line", { x1: 1.5, y1: 0, x2: 1.5, y2: 6, stroke: L.color, "stroke-width": 2 }));
+      defs.append(pat);
+    }
+    svg.append(defs);
+    for (let v = sc.lo; v <= sc.hi + sc.step / 1000; v += sc.step) {
+      svg.append(svgEl("line", { x1: m.l, x2: width - m.r, y1: y(v), y2: y(v), stroke: v === sc.lo ? "var(--axis)" : "var(--grid)", "stroke-width": 1 }));
+      const t = svgEl("text", { x: m.l - 6, y: y(v) + 4, "text-anchor": "end", "font-size": 11, fill: "var(--muted)", style: "font-variant-numeric: tabular-nums" });
+      t.textContent = v % 1000 === 0 ? kfmt(v) : nf1.format(v / 1000) + "K";
+      svg.append(t);
+    }
+    const step = (width - m.l - m.r) / (n - 1);
+    const every = [1, 2, 4, 5, 10, 13].find((k) => k * step >= 26) || 13;
+    rows.forEach((r, i) => {
+      if (every > 2 ? r.week % every !== 0 && i !== 0 : i % every !== 0) return;
+      const t = svgEl("text", { x: x(i), y: H - 8, "text-anchor": "middle", "font-size": 11, fill: "var(--muted)" });
+      t.textContent = String(r.week);
+      svg.append(t);
+    });
+    const band = (upper, lower, fill) => {
+      const pts = [...upper.map((v, i) => [x(i), y(v)]), ...lower.map((v, i) => [x(i), y(v)]).reverse()];
+      svg.append(svgEl("polygon", { points: pts.map((q) => q[0].toFixed(1) + "," + q[1].toFixed(1)).join(" "), fill, stroke: "var(--surface)", "stroke-width": 1, "stroke-linejoin": "round" }));
+    };
+    // a coupon of the plan year in the data (none in this case): actual demand is above the prediction there
+    const ownI = rows.map((r, i) => (r.own === "coupon" ? i : -1)).filter((i) => i >= 0);
+    if (ownI.length) {
+      const x0 = x(ownI[0]) - step / 2, x1 = x(ownI[ownI.length - 1]) + step / 2;
+      svg.append(svgEl("rect", { x: x0, y: m.t, width: x1 - x0, height: H - m.t - m.b, fill: "var(--grid)", opacity: 0.55 }));
+      const t = svgEl("text", { x: (x0 + x1) / 2, y: m.t + 12, "text-anchor": "middle", "font-size": 10.5, fill: "var(--ink-2)" });
+      t.textContent = `${M.YEAR} coupon`;
+      svg.append(t);
+    }
+    let lower = rows.map(() => 0);
+    for (const d of DRIVERS) {
+      const upper = rows.map((r, i) => lower[i] + pos(r, d.key));
+      if (upper.some((u, i) => u - lower[i] > 0.5)) band(upper, lower, d.color);
+      lower = upper;
+    }
+    // the base continues below the axis: a zigzag cut near the bottom
+    if (sc.lo > 0) {
+      const yb = H - m.b - 7;
+      let d = `M${m.l},${yb}`;
+      for (let xx = m.l, k = 0; xx < width - m.r; k++) { xx = Math.min(width - m.r, xx + 5); d += `L${xx.toFixed(1)},${(yb + (k % 2 ? 3 : -3)).toFixed(1)}`; }
+      svg.append(svgEl("path", { d, fill: "none", stroke: "var(--surface)", "stroke-width": 2.5, "stroke-linejoin": "round" }));
+    }
+    // what a driver takes away: hatched, from the sales level up to the top of the drivers
+    let gl = [...salesLine];
+    for (const L of LOSSES) {
+      const gu = rows.map((r, i) => gl[i] + neg(r, L.key));
+      if (gu.some((u, i) => u - gl[i] > 0.5)) band(gu, gl, `url(#hatch-${L.key})`);
+      gl = gu;
+    }
+    // actual sales (solid red) and forecast (dashed red)
+    const lastActual = rows.reduce((k, r, i) => (r.actualSales != null ? i : k), -1);
+    if (lastActual >= 0) {
+      const d = rows.slice(0, lastActual + 1).map((r, i) => (i ? "L" : "M") + x(i).toFixed(1) + "," + y(r.actualSales).toFixed(1)).join("");
+      svg.append(svgEl("path", { d, fill: "none", stroke: "var(--s8)", "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round" }));
+    }
+    if (lastActual < n - 1) {
+      const startI = Math.max(0, lastActual);
+      let d = `M${x(startI).toFixed(1)},${y(lastActual >= 0 ? rows[lastActual].actualSales : salesLine[0]).toFixed(1)}`;
+      for (let i = startI + 1; i < n; i++) d += `L${x(i).toFixed(1)},${y(salesLine[i]).toFixed(1)}`;
+      svg.append(svgEl("path", { d, fill: "none", stroke: "var(--s8)", "stroke-width": 2, "stroke-dasharray": "5 4", "stroke-linejoin": "round", "stroke-linecap": "round" }));
+    }
+    // actual demand in the weeks with data (ink): its gap to the top of the blue area is actual minus the prediction
+    const act = rows.map((r, i) => [i, r.actualDemand]).filter((q) => q[1] != null);
+    if (act.length > 1) {
+      const d = act.map(([i, v], k) => (k ? "L" : "M") + x(i).toFixed(1) + "," + y(v).toFixed(1)).join("");
+      svg.append(svgEl("path", { d, fill: "none", stroke: "var(--ink)", "stroke-width": 1.75, "stroke-linejoin": "round", "stroke-linecap": "round" }));
+    }
+    const cross = svgEl("line", { y1: m.t, y2: H - m.b, stroke: "var(--ink-2)", "stroke-width": 1, opacity: 0 });
+    svg.append(cross);
+    const hit = svgEl("rect", { x: m.l - step / 2, y: 0, width: width - m.l - m.r + step, height: H, fill: "transparent" });
+    svg.append(hit);
+    host.replaceChildren(svg);
+    const tip = el("div", "tip");
+    tip.hidden = true;
+    host.append(tip);
+    let cur = null;
+    const show = (i) => {
+      cur = Math.max(0, Math.min(n - 1, i));
+      const r = rows[cur];
+      cross.setAttribute("x1", x(cur)); cross.setAttribute("x2", x(cur)); cross.setAttribute("opacity", 1);
+      const yr = 2026;
+      tip.replaceChildren(el("div", "t-head", `Week ${r.week} · ${fmtDate(M.isoMonday(yr, r.week), true)}`));
+      const line = (color, label, v, hatched) => {
+        const row = el("div", "t-row");
+        const key = el("span", "t-key sw");
+        key.style.background = hatched ? `repeating-linear-gradient(45deg, ${color} 0 2px, transparent 2px 4px)` : color;
+        const txt = el("span");
+        txt.append(el("b", null, v), document.createTextNode(" "), el("i", null, label));
+        row.append(key, txt);
+        tip.append(row);
+      };
+      for (const d of DRIVERS) if (pos(r, d.key) > 0.5) line(d.color, d.label.split(":")[0], (d.key === "base" ? "" : "+") + nf.format(Math.round(pos(r, d.key))), false);
+      for (const L of LOSSES) if (neg(r, L.key) > 0.5) line(L.color, L.label, MINUS + nf.format(Math.round(neg(r, L.key))), true);
+      tip.append(el("div", "t-head", `= ${nf.format(Math.round(r.sales))} predicted demand with the coupon`));
+      if (r.actualDemand != null) {
+        line("var(--ink)", "actual demand", nf.format(Math.round(r.actualDemand)), false);
+        const diff = r.actualDemand - r.parts.base;
+        tip.append(el("div", "t-row", `${signed(Math.round(diff))} (${pctSigned(diff / r.parts.base)}) against the prediction without the coupon` +
+          (r.own === "coupon" ? ` · a week of the ${M.YEAR} coupon` : r.own === "dip" ? ` · the dip after the ${M.YEAR} coupon` : "")));
+      }
+      tip.hidden = false;
+      const tw = tip.offsetWidth;
+      let left = x(cur) + 10;
+      if (left + tw > width) left = x(cur) - tw - 10;
+      tip.style.left = Math.max(0, left) + "px";
+    };
+    const hide = () => { cross.setAttribute("opacity", 0); tip.hidden = true; cur = null; };
+    const pick = (ev) => { const b = svg.getBoundingClientRect(); show(Math.round((((ev.clientX - b.left) / b.width) * width - m.l) / step)); };
+    hit.addEventListener("pointermove", pick);
+    hit.addEventListener("pointerdown", pick);
+    hit.addEventListener("pointerleave", (ev) => { if (ev.pointerType === "mouse") hide(); });
+    host.onkeydown = (ev) => {
+      if (ev.key === "ArrowRight" || ev.key === "ArrowLeft") { ev.preventDefault(); show(cur == null ? 0 : cur + (ev.key === "ArrowRight" ? 1 : -1)); }
+      else if (ev.key === "Escape") hide();
+    };
+    host.onblur = hide;
+  }
+
+
+  /* ---------- state ---------- */
+  const DEF = M.DEFAULTS;
+  const CONTROL_PRICE = DEF.controlPrice ?? M.price(2026, "control", 42);
+  const MARKET_AVG = DEF.marketAvg || 1.5; // the usual category price (volume-weighted average deo price at normal prices)
+  const shareAt = (disc) => Math.round(M.shareFor(cal, disc / 100) * 100);
+  const state = {
+    discount: DEF.discount, startWeek: DEF.startWeek, fullWeeks: DEF.fullWeeks, partial: false, mau: M.MAU_2026,
+    price: DEF.price ?? M.price(2026, "test", 42),
+    // no rate in plan_assumptions.csv: start from the reference line through the past coupons, so the coupon shows at once
+    rate: DEF.rate == null ? { mode: "ref", value: null, text: "" } : { mode: "custom", value: DEF.rate, text: (DEF.rate * 100).toFixed(1) },
+    upr: DEF.upr ?? Math.round(cal.upr * 10) / 10, inc: DEF.inc ?? shareAt(DEF.discount), incAuto: DEF.inc == null,
+    pull: DEF.pull ?? Math.round(cal.dipDefault * 100), unc: DEF.unc,
+    fill: DEF.fill ?? Math.round(cal.frNormal * 100), delivery: [...M.DELIVERY_DEFAULT], lead: DEF.lead, depth: DEF.depth, dailyWeek: null, hourDay: 5, heatCell: [4, 9],
+    weather: "normal", // the plan weeks: cold / normal / warm (one standard deviation of the weekly temperature anomaly)
+  };
+  const WEATHER = { cold: -cal.anomalySd, normal: 0, warm: cal.anomalySd };
+  const planAnomaly = () => WEATHER[state.weather];
+  const refRate = () => Math.round(M.reference(cal, state.discount / 100, state.fullWeeks).rate * 1000) / 1000;
+  const hh = (h) => String(h).padStart(2, "0");
+  const FULL_DAY = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+
+  /* ---------- controls ---------- */
+  buildSeg("discount-group", "discount", [10, 20, 30].map((v) => ({ value: v, label: v + "%" })), state.discount, (v) => {
+    state.discount = v;
+    if (state.incAuto) { state.inc = shareAt(v); $("inc").value = String(state.inc); }
+    update();
+  });
+  buildSeg("length-group", "length", M.COUPON_LENGTHS.map((n) => ({ value: n, label: `${n} weeks` })), state.fullWeeks, (v) => {
+    state.fullWeeks = v;
+    const ok = M.startWeeks(v);
+    if (!ok.includes(state.startWeek)) state.startWeek = ok[ok.length - 1];
+    state.dailyWeek = null;
+    update();
+  });
+  const startSel = $("start-week");
+  startSel.addEventListener("change", (e) => { state.startWeek = Number(e.target.value); state.dailyWeek = null; update(); });
+  buildSeg("hour-day", "hday", DAYS.slice(0, 6).map((d, i) => ({ value: i, label: d })), state.hourDay, (v) => { state.hourDay = v; renderHourly(); });
+  buildSeg("weather-group", "weather", [["cold", `Cold (${nf1.format(-cal.anomalySd)} °C)`], ["normal", "Normal"], ["warm", `Warm (+${nf1.format(cal.anomalySd)} °C)`]].map(([value, label]) => ({ value, label })), state.weather, (v) => { state.weather = v; update(); });
+
+  const priceInput = $("price");
+  priceInput.value = nf2.format(state.price);
+  priceInput.addEventListener("input", () => { const v = parseNum(priceInput.value); if (v !== null && !Number.isNaN(v) && v > 0 && v < 100) { state.price = v; update(); } });
+  priceInput.addEventListener("blur", () => { priceInput.value = nf2.format(state.price); });
+
+  const mauInput = $("mau");
+  mauInput.addEventListener("input", () => { const digits = mauInput.value.replace(/[^0-9]/g, ""); state.mau = digits ? Number(digits) : 0; update(); });
+  mauInput.addEventListener("blur", () => { if (state.mau > 0) mauInput.value = nf.format(state.mau); });
+
+  const rateInput = $("rate");
+  if (state.rate.text) rateInput.value = state.rate.text;
+  rateInput.addEventListener("input", () => {
+    const st = state.rate;
+    st.text = rateInput.value;
+    const v = parseNum(rateInput.value);
+    if (v === null) { st.mode = "empty"; st.value = null; }
+    else if (Number.isNaN(v) || v < 0 || v > 100) { st.mode = "invalid"; st.value = null; }
+    else { st.mode = "custom"; st.value = v / 100; }
+    update();
+  });
+  $("use-ref").addEventListener("click", () => { state.rate.mode = "ref"; update(); });
+
+  const uprInput = $("upr");
+  uprInput.addEventListener("input", () => { const v = parseNum(uprInput.value); if (v !== null && !Number.isNaN(v) && v >= 0.1 && v <= 20) { state.upr = v; update(); } });
+  uprInput.addEventListener("blur", () => { uprInput.value = nfu.format(state.upr); });
+  const slider = (id, key, after) => $(id).addEventListener("input", (e) => { state[key] = Number(e.target.value); if (after) after(); update(); });
+  slider("inc", "inc", () => { state.incAuto = false; }); slider("pull", "pull"); slider("unc", "unc"); slider("fill", "fill");
+  const num = (id, key, lo, hi) => $(id).addEventListener("input", (e) => {
+    const v = Math.round(Number(e.target.value));
+    if (e.target.value !== "" && Number.isFinite(v) && v >= lo && v <= hi) { state[key] = v; update(); }
+  });
+  num("lead", "lead", 0, 365); num("depth", "depth", 1, 20);
+  $("daily-week").addEventListener("change", (e) => { state.dailyWeek = Number(e.target.value); renderDaily(); });
+
+  function syncControls() {
+    uprInput.value = nfu.format(state.upr);
+    $("inc").value = String(state.inc); $("pull").value = String(state.pull); $("unc").value = String(state.unc); $("fill").value = String(state.fill);
+  }
+
+  /* ---------- assumptions (values you can change on the page show the current setting) ---------- */
+  const andList = (a) => (a.length < 2 ? a.join("") : `${a.slice(0, -1).join(", ")} and ${a[a.length - 1]}`);
+  const shortSku = (name) => { const s = name.replace(M.NAME + " ", "").split(" (")[0].replace(/ \d+ ml$/, ""); return s.charAt(0).toLowerCase() + s.slice(1); };
+  function renderAssumptions() {
+    const order = M.WK.order, first = order[0], lastW = order[order.length - 1];
+    const ctrlPromo = Math.min(...order.map(([y, w]) => M.price(y, "control", w)));
+    const catLow = Math.min(...order.map(([y, w]) => M.price(y, "category", w)));
+    const catWeeks = order.filter(([y, w]) => M.price(y, "category", w) < MARKET_AVG - 1e-9).length;
+    const uprD = Math.round(cal.upr * 10) / 10, pullD = Math.round(cal.dipDefault * 100), fillD = Math.round(cal.frNormal * 100);
+    const incRef = shareAt(state.discount), win = cal.B26.window;
+    const groups = [
+      ["Context", [
+        "A drugstore publishes app coupons for a men's deo brand (test brand). Customers activate them in the app and redeem them at the store.",
+        "Region: Baden-Württemberg, 1 distribution centre and 450 stores, open 08:00 to 20:00, Monday to Saturday. Closed on Sundays and public holidays.",
+        `Data: fictional hourly store sales from week ${first[1]} of ${first[0]} to week ${lastW[1]} of ${lastW[0]} mimicking the seasonality shown in Google Trends Search for keyword "deo" in Germany (Data source: Google Trends, google.com/trends).`,
+        `Driver inputs: daily maximum temperature for Karlsruhe (Open-Meteo archive, to ${fmtDate(new Date(M.WEATHER.lastDay + "T00:00:00Z"))}); Baden-Württemberg public holidays; the weekly category price index.`,
+      ]],
+      ["Prices", [
+        `${B}: ${eur(state.price)} shelf price. With the coupon: ${eur(state.price * 0.9)}, ${eur(state.price * 0.8)} or ${eur(state.price * 0.7)} (10, 20 or 30% off).`,
+        `${M.CONTROL}: ${eur(CONTROL_PRICE)}, or ${eur(ctrlPromo)} in its promotion weeks (${pct0(1 - ctrlPromo / CONTROL_PRICE)} off).`,
+        `Category price index: the volume-weighted average shelf price of men's deo in the Drugstore, weekly. ${eur(MARKET_AVG)} at normal prices; down to ${eur(catLow)} in the ${catWeeks} weeks when the control brand or other brands were on promotion. The plan weeks assume normal prices.`,
+      ]],
+      ["Coupon", [
+        `Runs 2 or 4 weeks, Monday to Saturday. It can start in any week of ${M.YEAR} and has to end by week 52.`,
+        `Monthly active male app users: ${nf.format(state.mau)}.`,
+        "Redemption rate (Einlösequote) at full availability: user's estimate or the reference line through the past coupons.",
+        `A 2-week coupon gets ${pct0(M.lengthShare(cal, 2))} of a 4-week coupon's redemptions: the share of the first two weeks in 2025.`,
+        `Units per redemption: ${nfu.format(state.upr)} ` + (Math.abs(state.upr - uprD) < 1e-9 ? "(average of the past coupons)." : `(your setting; past coupons: ${nfu.format(uprD)}).`),
+        state.inc === incRef ? `Incremental share: ${state.inc}% at ${state.discount}% off (line through the past coupons by discount).` :
+          `Incremental share: ${state.inc}% (your setting; line through the past coupons: ${incRef}% at ${state.discount}% off).`,
+        `Dip after the coupon: ${state.pull}% of the incremental units ` + (state.pull === pullD ? "(average of the past coupons)" : `(your setting; past coupons: ${pullD}%)`) + ", spread over the 3 weeks after it as in 2025.",
+        "Weekly split: the shape of the 2025 coupon, launch week strongest. Hourly split: the normal hourly pattern.",
+      ]],
+      ["Normal demand (without the coupon)", [
+        "Baseline rule, fixed: same weekday and hour in the last 6 weeks. A value is an outlier above the middle value + 2 × standard deviation + 2. The baseline is the average of the 3 values around the median.",
+        `Normal demand of a day = baseline × season × calendar (shopping days before a holiday, the run-up to Christmas) × weather × price (against the category price index). The effects are measured on ${cal.trainYears.join(" and ")} and tested on ${M.YEAR} (Drivers card in the Forecast tab).`,
+        `Weeks 1 to ${M.LAST_DATA}: the drivers as they were (the counterfactual). Weeks ${M.LAST_DATA + 1} to 52: baseline of weeks ${win[0][1]} to ${win[win.length - 1][1]} of ${win[0][0]} × the season × ${M.YEAR}'s holiday calendar × the weather scenario (${state.weather}); prices at their usual level.`,
+        "Demand = sales ÷ fill rate.",
+      ]],
+      ["Supply chain", [
+        `Lead time: ${state.lead} days between the volume commit and the coupon start.`,
+        `Target fill rate: ${state.fill}% ` + (state.fill === fillD ? "(average of normal weeks)." : `(your setting; normal weeks: ${fillD}%).`),
+        `Redemption-rate uncertainty: ±${state.unc}%, used for the buffer in the volume to commit.`,
+        `${nf.format(M.PALLET)} units per pallet.`,
+        "Store delivery: " + (state.delivery.length === 1 ? `once a week, on ${FULL_DAY[state.delivery[0]]}.` : `on ${andList(state.delivery.map((d) => FULL_DAY[d]))}.`),
+        `Shelf, one high-volume store: ${M.SHELF.map((x, i) => `${shortSku(x.sku)} ${x.facings}${i === 0 ? " facings" : ""}`).join(", ")}; ${state.depth} units per facing; a normal week sells ${M.SHELF.map((x) => nf.format(x.normalWeek)).join(" / ")} units.`,
+      ]],
+    ];
+    $("assume-list").replaceChildren(...groups.flatMap(([title, items]) => {
+      const ul = el("ul");
+      items.forEach((t) => ul.append(el("li", null, t)));
+      return [el("h3", "mini", title), ul];
+    }));
+  }
+
+  /* ---------- render ---------- */
+  let last = null;
+  let version = 0;
+  // Redraw a chart only when the inputs or the chart's width changed, so an open tooltip survives unrelated resizes.
+  const fresh = (host) => {
+    const key = version + ":" + host.clientWidth;
+    if (host.dataset.key === key) return false;
+    host.dataset.key = key;
+    return true;
+  };
+  const scenario = (rate) => ({
+    discount: state.discount / 100, startWeek: state.startWeek, fullWeeks: state.fullWeeks, partialLastWeek: state.partial,
+    mau: state.mau > 0 ? state.mau : 0, rate, upr: state.upr, incShare: state.inc / 100, pullShare: state.pull / 100,
+    fillRate: state.fill / 100, rateUnc: state.unc / 100, price: state.price, controlPrice: CONTROL_PRICE, marketAvg: MARKET_AVG,
+    planAnomaly: planAnomaly(),
+  });
+
+  function update() {
+    const f = state.fill / 100;
+    // coupon length and start week: the start weeks on offer depend on the length (the coupon ends by week 52)
+    const starts = M.startWeeks(state.fullWeeks);
+    if (startSel.dataset.len !== String(state.fullWeeks)) {
+      startSel.replaceChildren(...starts.map((w) => {
+        const mon = M.isoMonday(M.YEAR, w);
+        const op = el("option", null, `Week ${w} · Monday ${fmtDate(mon, mon.getUTCFullYear() !== M.YEAR)}`);
+        op.value = String(w);
+        return op;
+      }));
+      startSel.dataset.len = String(state.fullWeeks);
+    }
+    startSel.value = String(state.startWeek);
+    $("start-hint").textContent = `A ${state.fullWeeks}-week coupon can start in weeks ${starts[0]} to ${starts[starts.length - 1]} (it has to end by week 52). ` +
+      (state.startWeek <= M.LAST_DATA ? `Week ${state.startWeek} is already in the data: the plan uses that week's normal demand from the data and shows what the coupon would have meant (what-if).` :
+        `Weeks 1 to ${M.LAST_DATA} are already in the data and give a what-if on that week's normal demand.`);
+    $("length-hint").textContent = state.fullWeeks === 4 ? "Like the past coupons, which all ran 4 weeks." :
+      `Past coupons all ran 4 weeks. A 2-week coupon is planned as their first two weeks: in 2025 these brought ${pct0(M.lengthShare(cal, 2))} of the coupon's extra units.`;
+
+    // redemption rate
+    const ref = M.reference(cal, state.discount / 100, state.fullWeeks);
+    const refR = refRate();
+    const st = state.rate;
+    if (st.mode === "ref") {
+      st.value = refR;
+      st.text = (refR * 100).toFixed(1);
+      if (rateInput.value !== st.text) rateInput.value = st.text;
+    }
+    const rateOk = (st.mode === "ref" || st.mode === "custom") && st.value != null;
+    const mauOk = state.mau > 0;
+    const ready = rateOk && mauOk;
+    $("use-ref").textContent = st.mode === "ref" ? `Reference ${pct1(refR)} in use` : `Use reference ${pct1(refR)}`;
+    $("use-ref").disabled = st.mode === "ref";
+    $("rate-hint").textContent = `Past ${B} coupons at full availability (observed rate ÷ fill rate): ${cal.past.map((p) => `${pct1(p.rateFull)} at ${pct0(p.discount)} off`).join(", ")}. The reference is the straight line through them` +
+      (state.fullWeeks === 4 ? "." : `, × ${pct0(ref.lengthShare)} for a 2-week coupon (the share of the first two weeks).`) +
+      (ref.extrapolated ? ` No past coupon had ${state.discount}% off, so the reference is extrapolated.` : "");
+    $("rate-error").hidden = st.mode !== "invalid";
+    $("rate-req").hidden = rateOk;
+    $("rate-field").classList.toggle("is-missing", !rateOk);
+    $("mau-error").hidden = mauOk;
+
+    const sc = scenario(rateOk ? st.value : 0);
+    const res = M.forecast(cal, sc);
+    last = { res, ready, sc };
+    version++;
+    const s = res.summary, P = s.price;
+
+    const vsMarket = (p) => (Math.abs(p / P.marketAvg - 1) < 0.005 ? "the same as" : `${pct0(Math.abs(1 - p / P.marketAvg))} ${p < P.marketAvg ? "below" : "above"}`);
+    $("price-line").textContent = `With ${state.discount}% off, coupon users pay ${eur(P.promo)} instead of ${eur(P.regular)}: ${vsMarket(P.promo)} the usual category price (the volume-weighted average deo price, ${eur(P.marketAvg)}). ${M.CONTROL}: ${eur(P.control)}.`;
+    const fitInc = shareAt(state.discount);
+    $("assume-note").textContent = `Defaults come from the past ${B} coupons; the 2025 coupon is measured from the data (Last coupon tab).`;
+    renderAssumptions();
+    $("upr-hint").textContent = `Past coupons: ${nf2.format(cal.upr)} on average.`;
+    $("inc-value").textContent = state.inc + "%";
+    $("inc-hint").textContent = `Units that would not have been sold without the coupon. Line through past coupons at ${state.discount}% off: ${fitInc}%. Measured for 2025 (20% off): ${pct0(cal.measured.extra)} ± ${nf1.format(cal.measured.extraHalf * 100)} points.` + (state.incAuto ? "" : " You changed this value; it no longer follows the discount.");
+    $("pull-value").textContent = state.pull + "%";
+    $("pull-hint").textContent = `Creates the dip after the coupon. Past coupons: ${pct0(cal.dipDefault)} on average; measured for 2025: ${pct0(cal.measured.dip)}.`;
+    $("unc-value").textContent = "±" + state.unc + "%";
+    $("fill-value").textContent = state.fill + "%";
+    $("fill-hint").textContent = `Share of demand that finds stock on the shelf. Normal weeks: ${pct1(cal.frNormal)} on average. In the 2025 coupon it fell to ${pct0(M.fr(2025, "test", 43))} in the launch week.`;
+    $("weather-hint").textContent = `Weeks after the data get normal weather unless you pick a scenario. The weather driver is ${pctSigned(M.weatherFactor(cal, 1) - 1)} per degree the daily maximum is above the seasonal normal; a ${state.weather === "normal" ? "warm" : state.weather} stretch of ${nf1.format(cal.anomalySd)} °C moves normal demand by ${pctSigned(M.weatherFactor(cal, cal.anomalySd) - 1)}. Weeks with data keep the weather they had.`;
+    const ivs = M.intervals(state.delivery);
+    $("delivery-hint").textContent = (state.delivery.length === 1 ? `Assumption: one delivery a week, on ${FULL_DAY[state.delivery[0]]}. ` : `Assumption: deliveries on ${state.delivery.map((i) => FULL_DAY[i]).join(", ")}. `) +
+      `Each delivery has to last until the next one: ${ivs.map((sp) => `${DAYS[sp[0]]} delivery covers ${M.spanLabel(sp)}`).join("; ")}. Stores are closed on Sunday.`;
+
+    const endWeek = Math.max(...s.weeks);
+    const endDate = new Date(M.isoMonday(M.YEAR, endWeek).getTime() + (state.partial ? 1 : 5) * 86400000);
+    $("scenario-line").replaceChildren(el("strong", null, `${B} · ${state.discount}% off · week ${state.startWeek} to ${endWeek}`),
+      document.createTextNode(` · ${fmtDate(s.startDate, false)} to ${fmtDate(endDate)}`));
+
+    const C = s.commit;
+    const due = M.deadline(s.startDate, state.lead);
+    const shelfRes = ready ? M.shelfCheck(cal, sc, res, state.delivery, state.depth) : null;
+    if (ready) {
+      const cw = res.rows.filter((r) => r.coupon);
+      const palBase = cw.reduce((a, r) => a + M.pallets(r.baseline), 0), palWith = cw.reduce((a, r) => a + M.pallets(r.demand), 0);
+      kpiTiles($("kpis"), [
+        { label: `Without the coupon, weeks ${Math.min(...s.weeks)} to ${Math.max(...s.weeks)}`, value: plain100(s.couponBaseline), sub: `units of normal demand · ${palBase} pallets` },
+        { label: "With the coupon", value: plain100(s.couponDemand), sub: `${plain100(s.redemptions)} redemptions · ${plain100(s.couponUnits)} units sold with it` },
+        { label: "Extra units from the coupon", value: hundreds(s.incremental), sub: `${signed(palWith - palBase)} pallets · ${hundreds(s.net)} net after the dip`, net: true },
+        { label: `Commit by ${fmtDate(due)}`, value: plain100(C.q), sub: `units for a ${state.fill}% fill rate · ${Math.abs(C.buffer) < 50 ? "no buffer needed" : hundreds(C.buffer) + " buffer on the forecast"}` },
+      ]);
+      // what the coupon means for logistics, in three lines: sales, logistics, shelf
+      const line = (label, ...parts) => {
+        const sp = el("span", "tk-line");
+        sp.append(el("span", "tk-label", label), ...parts.map((p) => (typeof p === "string" ? document.createTextNode(p) : p)));
+        return sp;
+      };
+      const peakRow = res.rows.filter((r) => r.coupon).reduce((a, b) => (M.pallets(b.demand) > M.pallets(a.demand) ? b : a));
+      const peakPal = M.pallets(peakRow.demand);
+      const whatIf = state.startWeek <= M.LAST_DATA;
+      const short = shelfRes.items.filter((x) => x.needed > x.facings);
+      const sug = shelfRes.suggestion;
+      $("takeaway").replaceChildren(
+        line("Sales", `${plain100(s.couponDemand)} units in the coupon weeks instead of ${plain100(s.couponBaseline)}: `, el("strong", null, `${plain100(s.incremental)} extra`),
+          `; of the ${plain100(s.couponUnits)} units sold with the coupon the rest would have been bought anyway. After the dip in the three weeks that follow: `, el("strong", null, `${plain100(s.net)} extra units net`), "." +
+          (s.dipOutside > 0 ? ` About ${plain100(s.dipOutside)} units of the dip fall after week 52.` : "")),
+        line("Logistics", whatIf ? "Supply chain would have had to commit " : "Supply chain has to commit ", el("strong", null, `${plain100(C.q)} units`), ` for the coupon weeks by `, el("strong", null, fmtDate(due)),
+          `, ${state.lead} days before the start, for a ${state.fill}% fill rate. The distribution centre peaks at `, el("strong", null, `${peakPal} pallets a week`),
+          ` instead of ${M.pallets(peakRow.baseline)} in week ${peakRow.week}.`),
+        line("Shelf", short.length
+          ? `In a high-volume store ${short.length === 1 ? "one product needs" : short.length + " products need"} more facings in the coupon weeks` +
+            (sug ? `, or an extra ${sug.day} delivery${sug.fitsAll ? ", which is enough" : ", which is not enough on its own"}.` : ".")
+          : "The current facings hold the peak in a high-volume store."),
+      );
+    } else {
+      const box = el("div", "kpi empty-state");
+      box.append(el("span", "k-label", "No forecast yet"),
+        el("p", null, !mauOk ? "Enter the number of monthly active male users to run the simulation." : "Enter your redemption-rate estimate for this coupon to run the simulation, or start from the reference based on past coupons."));
+      if (mauOk) {
+        const btn = el("button", "chip", `Use reference ${pct1(refR)}`);
+        btn.type = "button";
+        btn.addEventListener("click", () => { state.rate.mode = "ref"; update(); });
+        box.append(btn);
+      }
+      $("kpis").replaceChildren(box);
+      $("takeaway").replaceChildren();
+    }
+    $("takeaway").hidden = !ready;
+
+    // forecast tab
+    renderPaintingInfo();
+    $("bridge-note").textContent = "Demand in units. Grey bars are totals, red bars take units away. Values are rounded to the nearest 100.";
+    // tables: a 10-week window from the coupon start (weeks 43 to 52 when the coupon starts in week 43 or later)
+    const from = Math.min(state.startWeek, 43);
+    const plan = res.rows.filter((r) => r.week >= from && r.week <= from + 9);
+    const weekCell = (r) => `${r.week} · ${fmtDate(r.monday, r.monday.getUTCFullYear() !== M.YEAR)}`;
+    table("plan-table", ["Week", "Redemptions", "Normal demand", "Incremental", "Dip", "Demand", `Sales at ${state.fill}%`],
+      plan.map((r) => [weekCell(r), ready && r.coupon ? nf.format(Math.round(r.redemptions)) : blank, nf.format(Math.round(r.baseline)),
+        ready && r.incremental ? delta(r.incremental) : blank, ready && r.dip ? delta(-r.dip) : blank, ready ? nf.format(Math.round(r.demand)) : blank, ready ? nf.format(Math.round(r.sales)) : blank]),
+      (i) => (plan[i].coupon ? "is-coupon" : null));
+
+    // supply chain
+    const now = new Date();
+    const days = Math.round((due.getTime() - Date.UTC(now.getFullYear(), now.getMonth(), now.getDate())) / 86400000);
+    const leadText = `${state.lead} ${state.lead === 1 ? "day" : "days"} before the coupon starts on ${fmtDate(s.startDate)}`;
+    if (days < 0) status($("deadline"), "bad", "!", `Supply chain needed the coupon by ${fmtDate(due)}, ${leadText}. That date passed ${-days === 1 ? "yesterday" : -days + " days ago"}.`);
+    else status($("deadline"), "ok", "✓", `Tell supply chain by ${fmtDate(due)}, ${leadText}. That is ${days === 0 ? "today" : days === 1 ? "tomorrow" : "in " + days + " days"}.`);
+    note("deadline-note", `Supply chain fixes the volume ${state.lead} days ahead, before any redemption is seen, so the coupon has to be in the replenishment plan by this date.`,
+      `Last year it was not, and the fill rate fell to ${pct0(M.fr(2025, "test", 43))} in the launch week. The volume to commit includes a buffer for the forecast error (next card).`);
+    $("commit-sub").textContent = `Weeks ${Math.min(...s.weeks)} to ${endWeek}`;
+    if (ready) {
+      stats($("commit-stats"), [[plain100(C.mu), "forecast demand"], [plain100(C.q), `to commit for ${state.fill}% fill rate`], [hundreds(C.buffer), "buffer"]]);
+      note("commit-note", `Buffer: demand could be off by ±${plain100(C.sigma)} units (one standard deviation): ±${plain100(C.parts.base)} from normal demand, ±${plain100(C.parts.rate)} from the redemption rate (±${state.unc}%), ±${plain100(C.parts.share)} from the incremental share.`,
+        `The volume is fixed ${state.lead} days ahead, so the forecast error has to be covered up front. Normal demand: made the same way one year earlier, the plan missed the counterfactual of the 2025 coupon weeks by ${pct0(cal.baseErr25)} (weather, prices and shocks the plan cannot know). ` +
+        `Commit Q = forecast + z × σ, with z chosen so that the expected shortfall equals ${100 - state.fill}% of the forecast; a fill rate is not a service level, so z is small. Committing only the forecast gives an expected fill rate of ${pct1(C.fillIfMu)}.` + (C.buffer < 0 ? ` The target is below that, so less than the forecast is enough.` : ""));
+    } else {
+      stats($("commit-stats"), [[DASH, "forecast demand"], [DASH, `to commit for ${state.fill}% fill rate`], [DASH, "buffer"]]);
+      $("commit-note").textContent = "Enter the redemption rate to see the volume to commit.";
+    }
+    $("fill-sub").textContent = `Target ${state.fill}%`;
+    if (ready) stats($("fill-stats"), [[plain100(s.couponDemand), "demand in the coupon weeks"], [plain100(s.couponSales), `sales at ${state.fill}%`], [plain100(s.couponLost), "lost on empty shelves"]]);
+    else stats($("fill-stats"), [[DASH, "demand in the coupon weeks"], [DASH, `sales at ${state.fill}%`], [DASH, "lost on empty shelves"]]);
+    note("fill-note", `Last year the coupon was not in the replenishment plan: the fill rate fell to ${pct0(M.fr(2025, "test", 43))} in the launch week and ${plain100(cal.lost25)} units of demand found an empty shelf.`,
+      `It averaged ${pct1(cal.frc25)} over the coupon. Measured on sales the 2025 coupon added ${plain100(cal.extraOnSales25)} units; with full shelves it would have been ${plain100(cal.extra25)} (demand = sales ÷ fill rate).`);
+    table("pallet-table", ["Week", "Without coupon", "With coupon"],
+      plan.map((r) => [weekCell(r), String(M.pallets(r.baseline)), ready ? String(M.pallets(r.demand)) : blank]),
+      (i) => (plan[i].coupon ? "is-coupon" : null));
+    if (ready) {
+      const peakRow = res.rows.filter((r) => r.coupon).reduce((a, b) => (M.pallets(b.demand) > M.pallets(a.demand) ? b : a));
+      const lowWeeks = res.rows.filter((r) => r.dipWeek && M.pallets(r.demand) < M.pallets(r.baseline)).length;
+      $("pallet-note").textContent = `Peak: ${M.pallets(peakRow.demand)} pallets in week ${peakRow.week} against ${M.pallets(peakRow.baseline)} without the coupon.` + (lowWeeks ? ` After the coupon the need drops below normal for ${lowWeeks === 1 ? "one week" : lowWeeks + " weeks"}.` : "");
+    } else $("pallet-note").textContent = "Enter the redemption rate to see the pallets with the coupon.";
+    const pal = (w) => Math.round(M.row(2025, w).dc_orders_test / M.PALLET);
+    $("lastyear-note").textContent = `Last year's coupon (weeks 43 to 47) was not in the replenishment forecast. Distribution centre orders jumped from ${pal(42)} to ${pal(43)} pallets when it started and fell to ${pal(48)} after it ended.`;
+
+    const sel = $("daily-week");
+    if (!plan.some((r) => r.week === state.dailyWeek)) state.dailyWeek = state.startWeek;
+    // the daily plan of a week with data uses that week's own weekday shares and closed days
+    sel.replaceChildren(...plan.map((r) => {
+      const op = el("option", null, `Week ${r.week} · ${fmtDate(r.monday, r.monday.getUTCFullYear() !== M.YEAR)}${r.coupon ? (r.couponDays.length < 6 ? " · coupon Mon–Tue" : " · coupon") : r.dipWeek ? " · after the coupon" : ""}`);
+      op.value = String(r.week);
+      op.selected = r.week === state.dailyWeek;
+      return op;
+    }));
+    renderDaily();
+
+    if (ready) {
+      const sh = shelfRes;
+      $("shelf-sub").textContent = `${state.delivery.length === 1 ? "Delivery" : "Deliveries"} ${state.delivery.map((i) => DAYS[i]).join(", ")} (assumption)`;
+      const short = sh.items.filter((x) => x.needed > x.facings);
+      const peakTxt = `The tightest stretch is ${sh.peak.label} in week ${sh.peak.week}: ${pct0(sh.peak.factor)} of a normal week's sales between two deliveries.`;
+      if (short.length) {
+        const sug = sh.suggestion;
+        status($("shelf-summary"), "warn", "!", `${peakTxt} The shelf runs empty for ${short.length === 1 ? "one product" : short.length + " products"}. Add facings for the coupon weeks` +
+          (sug ? `, or add a ${sug.day} delivery${sug.fitsAll ? ", which is enough" : ", which is not enough on its own"}.` : "."));
+      } else status($("shelf-summary"), "ok", "✓", `${peakTxt} The current shelf holds it.`);
+      const facings = (n) => `${n} ${n === 1 ? "facing" : "facings"}`;
+      $("shelf-list").replaceChildren(...sh.items.map((x) => {
+        const box = el("div", "sku");
+        const head = el("div", "sku-head");
+        head.append(el("span", "sku-name", x.sku));
+        const ok = x.needed <= x.facings;
+        head.append(el("span", "pill " + (ok ? "ok" : "bad"), ok ? `OK · ${facings(x.facings)}` : `Needs ${facings(x.needed)} (+${x.needed - x.facings})`));
+        const facts = el("div", "sku-facts");
+        [[nf1.format(x.peakDemand), `${sh.peak.label}, week ${sh.peak.week}`], [nf1.format(x.normalDemand), "same stretch, without the coupon"], [String(x.capacity), "shelf capacity"]].forEach(([v, l]) => {
+          const fct = el("div", "fact"); fct.append(el("b", null, v), el("span", null, l)); facts.append(fct);
+        });
+        box.append(head, facts);
+        return box;
+      }));
+    } else {
+      $("shelf-sub").textContent = "";
+      status($("shelf-summary"), "info", "i", "Enter the redemption rate to check the shelf.");
+      $("shelf-list").replaceChildren();
+    }
+
+    renderLastCoupon();
+    renderDrivers();
+    renderMethod();
+    drawCharts();
+  }
+
+  function renderDaily() {
+    if (!last) return;
+    const { res, ready, sc } = last;
+    if (!res.rows.some((x) => x.week === state.dailyWeek)) return;
+    const f = state.fill / 100;
+    const days = M.daily(cal, sc, res, state.dailyWeek);
+    const maxV = Math.max(...days.map((d) => (ready ? d.demand : d.baseline)), 1);
+    const head = ready ? ["Day", "Demand", `Sales at ${state.fill}%`, "Delivery"] : ["Day", "Baseline", "Delivery"];
+    table("daily-table", head, days.map((d, i) => {
+      const date = fmtDate(new Date(d.date + "T00:00:00Z"), false);
+      if (d.closed) return ready ? [`${d.day} ${date}`, { text: "Closed", cls: "dim" }, blank, blank] : [`${d.day} ${date}`, { text: "Closed", cls: "dim" }, blank];
+      const v = ready ? d.demand : d.baseline;
+      const cell = el("div", "bar-cell");
+      const bar = el("i");
+      bar.style.width = Math.round((v / maxV) * 50) + "px";
+      cell.append(el("span", null, nf.format(Math.round(v))), bar);
+      const delivery = state.delivery.includes(i) ? "Yes" : blank;
+      const label = `${d.day} ${date}` + (d.coupon && ready ? " · coupon" : "");
+      return ready ? [label, cell, nf.format(Math.round(v * f)), delivery] : [label, cell, delivery];
+    }), (i) => (days[i].closed ? "is-closed" : days[i].coupon && ready ? "is-coupon" : null));
+    // weeks with data: what each day sold ÷ the fill rate, against the model's normal demand of that day
+    const inData = state.dailyWeek <= M.LAST_DATA;
+    $("daily-actual").hidden = !inData;
+    if (inData) {
+      const actualOf = (i) => { const p = cal.all.days.find((q) => q.year === M.YEAR && q.week === state.dailyWeek && q.d === i); return p && !p.closed ? p.P : null; };
+      $("daily-actual-label").textContent = `Actual against the model, week ${state.dailyWeek}`;
+      table("daily-actual-table", ["Day", "Predicted without the coupon", "Actual demand", "Actual − predicted"], days.map((d, i) => {
+        const date = fmtDate(new Date(d.date + "T00:00:00Z"), false);
+        if (d.closed) return [`${d.day} ${date}`, { text: "Closed", cls: "dim" }, blank, blank];
+        const a = actualOf(i);
+        return [`${d.day} ${date}`, nf.format(Math.round(d.baseline)), a != null ? nf.format(Math.round(a)) : blank, a != null ? delta(a - d.baseline) : blank];
+      }), (i) => (days[i].closed ? "is-closed" : null));
+    }
+    const r = res.rows.find((x) => x.week === state.dailyWeek);
+    if (state.dailyWeek <= M.LAST_DATA) note("daily-note", `Week ${state.dailyWeek} is in the data: a what-if on that week's normal demand, with what each day actually sold.`,
+      `Each weekday's share comes from that week's normal demand, so closed days and public holidays are in it. Below it: what each day actually sold ÷ the fill rate, against the model's normal demand.`);
+    else note("daily-note", `Each weekday's share comes from the baseline rule and the drivers of that day (2026's holidays, the season, ${state.weather} weather).`,
+      `The baseline rule gives the weekday pattern of the last 6 weeks; the drivers add 2026's holiday calendar (closed days, the shopping days before a holiday, the short day before Christmas), the season and the ${state.weather} weather scenario.`);
+    renderDailyDrivers();
+    renderHourly();
+  }
+
+  // the drivers of each day of the selected week: the factors the normal demand of the day is built from
+  function renderDailyDrivers() {
+    const w = state.dailyWeek, inData = w <= M.LAST_DATA;
+    const rows = [0, 1, 2, 3, 4, 5].map((d) => ({ d, f: M.feat(M.YEAR, w, d), p: M.dayDrivers(cal, w, d, planAnomaly()) }));
+    $("daily-drivers-label").textContent = `The drivers of each day, week ${w}` + (inData ? " (as they were)" : ` (plan: ${state.weather} weather)`);
+    const fx = (v) => (Math.abs(v - 1) < 0.0005 ? { text: "1.00", cls: "dim" } : { text: nf2.format(v), cls: v > 1 ? "pos" : "neg" });
+    const head = ["Day", "Season", "Calendar", "Weather", "Price", "All together"];
+    table("daily-drivers-table", head, rows.map(({ d, f, p }) => {
+      const date = fmtDate(new Date(f.date.getTime()), false);
+      if (!p) return [`${DAYS[d]} ${date}`, { text: "Closed", cls: "dim" }, blank, blank, blank, blank];
+      const label = `${DAYS[d]} ${date}` + (f.closeHour < M.HOURS[M.HOURS.length - 1] + 1 ? ` · until ${hh(f.closeHour)}:00` : "");
+      return [label, fx(p.season), fx(p.calendar), fx(p.weather), fx(p.price), { text: nf2.format(p.total), cls: "" }];
+    }), (i) => (rows[i].p ? null : "is-closed"));
+    const cal_ = rows.filter((r) => r.p && Math.abs(r.p.calendar - 1) > 0.0005);
+    note("daily-drivers-note", `Normal demand of a day = the neutral baseline for that weekday × the factors in its row. ` +
+      (cal_.length ? `Calendar above 1.00: ${cal_.map((r) => `${DAYS[r.d]} ${nf2.format(r.p.calendar)}`).join(", ")} (a shopping day before a public holiday, or the run-up to Christmas).` : "No public holiday nearby this week."),
+      inData ? `Weather is the day's maximum temperature against its seasonal normal; price is ${B}'s price against the category price index that week (below 1.00 when other brands were on promotion).` :
+        `Prices are not known in advance, so the plan keeps them at their usual level (1.00); weather follows the scenario you pick under Assumptions.`);
+  }
+
+  function renderHourly() {
+    if (!last) return;
+    const { res, ready, sc } = last;
+    if (!res.rows.some((x) => x.week === state.dailyWeek)) return;
+    const { day, rows } = M.hourly(cal, sc, res, state.dailyWeek, state.hourDay);
+    const date = fmtDate(new Date(day.date + "T00:00:00Z"), false);
+    $("hour-label").textContent = `Hourly plan, ${day.day} ${date}, 08:00 to 20:00`;
+    const maxV = Math.max(...rows.map((r) => (ready ? r.demand : r.baseline)), 1);
+    const bar = (v) => { const c = el("div", "bar-cell"); const i = el("i"); i.style.width = Math.round((v / maxV) * 50) + "px"; c.append(el("span", null, nf.format(Math.round(v))), i); return c; };
+    const peak = rows.reduce((a, b) => ((ready ? b.demand : b.baseline) > (ready ? a.demand : a.baseline) ? b : a));
+    const head = ready ? ["Hour", "Baseline", "Incremental", "Demand"] : ["Hour", "Baseline"];
+    table("hour-table", head, rows.map((r) => {
+      const lab = `${hh(r.hour)}–${hh(r.hour + 1)}`;
+      const inc = r.incremental - r.dip;
+      return ready ? [lab, nf.format(Math.round(r.baseline)), Math.round(inc) ? delta(inc) : blank, bar(r.demand)] : [lab, bar(r.baseline)];
+    }), (i) => (rows[i] === peak ? "is-coupon" : null));
+    note("hour-note", `The busiest hour is ${hh(peak.hour)}:00 to ${hh(peak.hour + 1)}:00 with ${pct1(peak.share)} of the day.`,
+      `Units for the region. Each hour's share of the day is the ${B} baseline for ${FULL_DAY[state.hourDay]}: the same weekday and hour in the 6 weeks before.` + (ready ? " Incremental units use the same hourly shares; in 2025 the coupon followed the normal hourly pattern (Last coupon)." : ""));
+  }
+
+  /* ---------- forecast chart: baseline + incremental - dip ---------- */
+  const DRIVERS = [
+    { key: "base", label: "Predicted demand without the coupon", color: "var(--accent)" },
+    { key: "coupon", label: "Predicted incremental demand from the planned coupon", color: "var(--s5)" },
+  ];
+  const LOSSES = [
+    { key: "dip", label: "Dip after the coupon", color: "var(--s5)" },
+  ];
+  const pos = (r, k) => Math.max(0, r.parts[k] || 0);
+  const neg = (r, k) => Math.max(0, -(r.parts[k] || 0));
+  const paintScale = (rows) => {
+    const top = rows.map((r) => sum(DRIVERS.map((d) => pos(r, d.key))));
+    const sales = rows.map((r, i) => top[i] - sum(LOSSES.map((L) => neg(r, L.key))));
+    const actual = rows.flatMap((r) => [r.actualSales, r.actualDemand]).filter((v) => v != null);
+    const minV = Math.min(...sales, ...actual, ...rows.map((r) => r.parts.base));
+    const maxV = Math.max(...top, ...actual);
+    return { top, sales, sc: niceScale(minV * 0.9, maxV * 1.03) };
+  };
+  const paintRows = () => {
+    const { res, ready, sc } = last;
+    // the plan view of 2026: normal demand of every week (from the data up to week 42, the plan baseline after it),
+    // the coupon you plan, the dip after it and the volume lost on empty shelves at the target fill rate
+    return res.rows.map((r) => {
+      const parts = { base: r.baseline, coupon: ready ? r.incremental : 0, dip: ready ? -r.dip : 0, shelves: 0 };
+      const demand = parts.base + parts.coupon + parts.dip;
+      parts.shelves = -demand * (1 - sc.fillRate);
+      parts.shelves = 0; // the chart shows demand; empty shelves are in the Logistics tab
+      // actual demand (sales ÷ fill rate) in the weeks with data, to compare with the predicted demand without the coupon
+      const actualDemand = r.week <= M.LAST_DATA ? cal.cf26.get(r.week).actual : null;
+      const own = !M.C26 ? null : M.C26.full.includes(r.week) ? "coupon" : M.C26.post.includes(r.week) ? "dip" : null;
+      return { week: r.week, parts, demand, sales: demand, actualSales: null, actualDemand, own, forecast: true };
+    });
+  };
+  // actual against the model in the weeks with data of the plan year
+  const actualNote = () => {
+    const out = [...cal.cf26.values()].filter((x) => x.week <= M.LAST_DATA && !x.own);
+    const sat0 = new Date(M.isoMonday(M.YEAR, M.LAST_DATA).getTime() + 5 * 86400000);
+    const dev = (x) => x.actual / x.cf - 1;
+    const mad = out.reduce((a, x) => a + Math.abs(dev(x)), 0) / out.length;
+    const big = out.reduce((a, x) => (Math.abs(dev(x)) > Math.abs(dev(a)) ? x : a));
+    const c = M.C26, sat = sat0;
+    return `Actual demand = units sold ÷ that week's fill rate, up to the end of the data, Saturday ${fmtDate(sat, false)}. ` +
+      `It was ${pct1(mad)} away from the prediction on average (largest in week ${big.week}: ${pctSigned(dev(big))})` +
+      (c ? `, outside the ${M.YEAR} coupon. In the coupon weeks ${c.full[0]} to ${c.full[c.full.length - 1]} it was ${hundreds(cal.m26.extra)} units above the prediction and in the dip weeks ${c.post[0]} to ${c.post[c.post.length - 1]} ${hundreds(-cal.m26.dip)}.` : `. There was no coupon in ${M.YEAR} so far, so the gap is the model's error.`) +
+      ` Past coupons are measured in the Last coupon tab.`;
+  };
+  function renderPaintingInfo() {
+    if (!last) return;
+    const { ready } = last;
+    const rows = paintRows();
+    const lg = $("paint-legend");
+    lg.replaceChildren();
+    for (const d of DRIVERS) { if (!rows.some((r) => pos(r, d.key) > 0.5)) continue; const sp = el("span"); const k = el("i", "key sq"); k.style.background = d.color; sp.append(k, document.createTextNode(d.label)); lg.append(sp); }
+    for (const L of LOSSES) { if (!rows.some((r) => neg(r, L.key) > 0.5)) continue; const sp = el("span"); const k = el("i", "key sq"); k.style.background = `repeating-linear-gradient(45deg, ${L.color} 0 2px, transparent 2px 4px)`; sp.append(k, document.createTextNode(L.label)); lg.append(sp); }
+    if (ready) { const sp = el("span"); sp.append(el("i", "key red dash"), document.createTextNode("Predicted demand with the coupon")); lg.append(sp); }
+    if (rows.some((r) => r.actualDemand != null)) { const sp = el("span"); sp.append(el("i", "key ink"), document.createTextNode(`Actual demand (weeks 1 to ${M.LAST_DATA})`)); lg.append(sp); }
+    const cut = paintScale(rows).sc.lo;
+    const pa = planAnomaly();
+    note("paint-note", `Blue: predicted demand without a coupon. Pink and the red dashed line: with the coupon you plan (hatched: the dip after it). Black: actual demand up to week ${M.LAST_DATA}; ${M.YEAR} had no coupon so far, so its gap to the blue area is the model's error. Last year's coupon is measured in the Last coupon tab.` + (ready ? "" : " Enter the redemption rate to add the coupon."),
+      `Weeks 1 to ${M.LAST_DATA} come from the data: the rolling baseline × the drivers of each day as they were (season, holidays, weather and prices). From week 43 the plan: the baseline frozen at weeks 37 to 42 × the season × 2026's holiday calendar × ${state.weather} weather (${plain100(M.normalDemand(cal, 43, pa))} in week 43, ${plain100(M.normalDemand(cal, 50, pa))} in week 50, ${plain100(M.normalDemand(cal, 52, pa))} in week 52 with Christmas Eve a short day and 25 and 26 December closed). ` +
+      `${actualNote()} The axis starts at ${cut % 1000 === 0 ? kfmt(cut) : nf1.format(cut / 1000) + "K"}.`);
+    table("paint-table", ["Week", "Predicted without the coupon", "Extra from the coupon", "Dip", "Predicted with the coupon", "Actual demand", "Actual − predicted without"], rows.map((r) => [String(r.week) + (r.own === "coupon" ? ` · ${M.YEAR} coupon` : ""), nf.format(Math.round(r.parts.base)),
+      r.parts.coupon ? delta(r.parts.coupon) : blank, r.parts.dip ? delta(r.parts.dip) : blank, nf.format(Math.round(r.sales)),
+      r.actualDemand != null ? nf.format(Math.round(r.actualDemand)) : blank, r.actualDemand != null ? delta(r.actualDemand - r.parts.base) : blank]),
+      (i) => (rows[i].parts.coupon > 0.5 ? "is-coupon" : null));
+  }
+
+  /* ---------- drivers: the effects and the test ---------- */
+  const DRIVER_ROWS = () => {
+    const c = (k) => cal.drivers.coef(k), se = (k) => cal.drivers.se(k);
+    const eff = (k, x = 1) => pctSigned(Math.exp(c(k) * x) - 1), pm = (k, x = 1) => `±${nf1.format((Math.exp(1.96 * se(k) * x) - 1) * 100)}`;
+    const sc_ = cal.seasonCurve, lo = sc_.indexOf(Math.min(...sc_)) + 1, hi = sc_.indexOf(Math.max(...sc_)) + 1;
+    return [
+      ["Season", "a smooth yearly curve (5 sine/cosine pairs), the same every year", `${pctSigned(Math.min(...sc_) - 1)} to ${pctSigned(Math.max(...sc_) - 1)}`, `low in week ${lo}, peak in week ${hi}`, "this year's curve, week by week"],
+      ["Day before a holiday", "the first shopping day before a public holiday", eff("pre1"), pm("pre1"), "24 December (before 25 and 26 December: two holidays, so twice)"],
+      ["Two days before a holiday", "the second shopping day before a public holiday", eff("pre2"), pm("pre2"), "23 December"],
+      ["Run-up to Christmas", "1 to 24 December, rising to the full effect on 23 December", eff("xmas"), pm("xmas"), "as measured"],
+      ["Weather", "per 1 °C the daily maximum is above the seasonal normal", eff("anomaly"), pm("anomaly"), `normal, cold or warm (±${nf1.format(cal.anomalySd)} °C: ${eff("anomaly", -cal.anomalySd)} / ${eff("anomaly", cal.anomalySd)})`],
+      ["Price", "the category price index 5% lower (other brands on promotion), Deo Test Brand's price unchanged", eff("z", -Math.log(0.95)), pm("z", -Math.log(0.95)), "normal prices (1.00)"],
+    ];
+  };
+  function renderDrivers() {
+    const h = cal.holdout;
+    $("drivers-sub").textContent = `${B} · measured on ${cal.trainYears.join(" and ")}, tested on ${M.YEAR}`;
+    note("drivers-intro", "Normal demand of a day = the baseline for that weekday and hour × season × calendar × weather × price.",
+      `The effects are measured together, in one regression on the log of daily demand (${nf.format(cal.drivers.fit.n)} days of ${cal.trainYears.join(" and ")}, outside ${B}'s own coupons), so a hot week in July is not mistaken for the season. Weather is the daily maximum against its seasonal normal, so it cannot absorb the season. Price is ${B}'s shelf price against the category price index (the volume-weighted average shelf price of men's deo), so every brand's promotion enters, not just one competitor's. ` +
+      `The weekday and the level are not drivers: the baseline rule carries them, 6 weeks at a time.`);
+    table("drivers-table", ["Driver", "Effect on normal demand", "In the plan weeks"], DRIVER_ROWS().map(([name, desc, effect, pm, plan]) => {
+      const a = el("span", "drv"); a.append(el("b", null, name), el("small", null, desc));
+      const b = el("span", "drv " + (effect.startsWith("+") ? "pos" : effect.startsWith(MINUS) ? "neg" : "")); b.append(el("b", null, effect), el("small", null, pm.startsWith("±") ? `95%: ${pm}` : pm));
+      return [a, b, plan];
+    }));
+  }
+
+  /* ---------- last coupon: measurement ---------- */
+  function renderLastCoupon() {
+    const cfC = cal.m25.cfCoupon;
+    const net = cal.extra25 - cal.dip25;
+    const ms = $("ci-stats");
+    ms.replaceChildren(...[
+      [hundreds(cal.extra25), `incremental units, weeks 43–47 (95%: ${plain100(cal.extra25 - cal.extraHalf)} to ${plain100(cal.extra25 + cal.extraHalf)})`],
+      [pctSigned(cal.extra25 / cfC), "against the counterfactual"],
+      [hundreds(-cal.dip25), "dip, weeks 48–50"],
+      [hundreds(net), `net (95%: ${plain100(net - cal.netHalf)} to ${plain100(net + cal.netHalf)})`],
+    ].map(([v, l]) => { const d = el("div"); d.append(el("b", null, v), el("span", null, l)); return d; }));
+    note("ci-note", `Weekly demand against the counterfactual (the neutral baseline × the drivers of each day). Outside the coupon the counterfactual misses actual weekly demand by ${pct1(cal.sdW)} on average.`,
+      `Outside the coupon the baseline rolls: each week comes from the 6 weeks before it, so these weeks are an out-of-sample test. During the coupon and its dip the baseline is frozen at weeks 37 to 42, so the coupon cannot leak into it. Drivers: season, holidays, weather, prices. Demand = sales ÷ fill rate.`);
+    note("cum-note", `The line climbs during the coupon and falls back in the three weeks after it, when buyers who stocked up stay away.`,
+      `The band is the 95% interval. It widens with time because daily errors and the error of the frozen baseline level add up.`);
+    // the control brand: its own drivers model, and its deviation in the coupon weeks
+    const cc = cal.controlCheck, c25 = cc.years[2025], c24 = cc.years[2024];
+    stats($("price-stats"), [[pctSigned(c25.coupon), "control brand vs its own normal, 2025 coupon weeks"], [pctSigned(c24.coupon), "the same, 2024 coupon weeks"],
+      [pct1(cc.sdWControl), "the control's usual weekly error"]]);
+    note("price-note", `The control brand stayed on its own normal path in the coupon weeks (${pctSigned(c25.coupon)} in 2025, ${pctSigned(c24.coupon)} in 2024, within its weekly error of ${pct1(cc.sdWControl)}): no sign that the coupon took its buyers.`,
+      `${M.CONTROL} gets the same model: its own baseline and its own drivers (its price against the category price index). If the coupon pulled the control's buyers, the control would fall below its own normal demand in the coupon weeks. ` +
+      `Competitors' promotions, the control's included, enter ${B} through the category price index: when the index is 5% lower, ${B} sells ${pctSigned(Math.exp(-cal.drivers.coef("z") * Math.log(0.95)) - 1)}.`);
+    renderBaseline();
+    {
+      const H = cal.hours25, dev = Math.max(...H.extraShare.map((v, i) => Math.abs(v - H.baseShare[i])));
+      const pk = H.extra.indexOf(Math.max(...H.extra));
+      note("hours-note", `Weeks 43 to 46 of 2025, ${H.days} full coupon days: the gap between the lines is the coupon's extra demand by hour, largest at ${hh(M.HOURS[pk])}:00 (${nf.format(Math.round(H.extra[pk]))} units).`,
+        `Measured like a TV spot against its baseline. Each hour's share of the incremental demand is within ${nf1.format(dev * 100)} points of its share of the counterfactual, so the plan spreads incremental units with the normal hourly shares. In this fictional data that is built in; real redemption data would show whether app users shop at other hours.`);
+    }
+    const metrics = [
+      ["Discount", (p) => pct0(p.discount)],
+      ["App users", (p) => kfmt(p.mau)],
+      ["Observed rate", (p) => pct1(p.rateObs)],
+      ["Fill rate", (p) => pct1(p.fillRate)],
+      ["Rate at full availability", (p) => pct1(p.rateFull)],
+      ["Units per redemption", (p) => nf2.format(p.upr)],
+      ["Incremental share", (p) => pct1(p.extra)],
+      ["Dip", (p) => pct1(p.dip)],
+      ["Source", (p) => (p.measured ? "measured" : "report")],
+    ];
+    note("past-note", `Each column is one coupon in this region, all measured with the counterfactual: ${cal.ms.map((m) => `${m.c.year} ${hundreds(m.extra)} incremental units`).join(", ")}.`,
+      `95% intervals: ${cal.ms.map((m) => `${m.c.year} ${plain100(m.extra - m.extraHalf)} to ${plain100(m.extra + m.extraHalf)}`).join(", ")}. Rate at full availability = observed rate ÷ fill rate during the coupon; the references for the redemption rate and the incremental share are straight lines through the past coupons by discount.`);
+    table("past-table", ["", ...cal.past.map((p) => `${p.year} · W${p.weeks.replace("–", "–⁠")}`)], metrics.map(([name, fn]) => [name, ...cal.past.map(fn)]),
+      (i) => (["Rate at full availability", "Incremental share"].includes(metrics[i][0]) ? "is-coupon" : null));
+  }
+
+  /* ---------- baseline rule: worked example and weekday x hour map (2026, the plan baseline) ---------- */
+  function renderBaseline() {
+    const R = cal.planWin.L.cells;
+    const slot = (d, i) => `${DAYS[d]} ${hh(M.HOURS[i])}:00–${hh(M.HOURS[i] + 1)}:00`;
+    $("base-sub").textContent = `${B}, 2026`;
+    note("base-intro", "The rule from the minute-level TV baseline, per hour: the same weekday and hour in the last 6 weeks as neutral demand (the hour's demand ÷ the drivers of its day). Shown: the frozen baseline for the plan, weeks 37 to 42.",
+      "Dividing by the drivers means a hot day or a day before a holiday does not count more than it should. Ranked high to low, a value is an outlier when it is above the middle value + 2 × the standard deviation of the middle ranks + 2. The baseline is the average of the 3 values around the median of the values that are left. Closed days and closed hours are left out.");
+    const [d0, i0] = state.heatCell;
+    const smp = cal.sample(d0, i0), c = R[d0][i0];
+    $("base-ex-title").textContent = `Example: ${slot(d0, i0)}`;
+    const ranked = smp.filter((x) => x.adj != null).sort((a, q) => q.adj - a.adj).map((x) => x.week);
+    table("base-ex-table", ["Week", "Actual", "Drivers", "Neutral", "Rank", "Rule"], smp.map((x) => {
+      const st = x.status;
+      const wk = el("span", "wk-cell", String(x.week));
+      wk.append(el("small", null, fmtDate(new Date(x.date + "T00:00:00Z"), false)));
+      return [wk, x.raw == null ? blank : nf.format(Math.round(x.raw)), x.factor == null ? blank : nf2.format(x.factor), x.adj == null ? blank : nf.format(Math.round(x.adj)),
+        x.adj == null ? blank : String(ranked.indexOf(x.week) + 1), { text: st, cls: st === "outlier" ? "neg" : st === "used" ? "pos" : "dim" }];
+    }), (k) => (smp[k].status === "used" ? "is-coupon" : null));
+    const big = smp.filter((x) => x.factor != null).sort((a, q) => Math.abs(q.factor - 1) - Math.abs(a.factor - 1))[0];
+    const why = big ? Object.entries(big.parts).filter(([, v]) => Math.abs(v - 1) > 0.03).map(([k, v]) => `${k} ${nf2.format(v)}`).join(", ") : "";
+    note("base-ex-note", `Threshold ${nf.format(Math.round(c.threshold))}: ${c.nOut} ${c.nOut === 1 ? "value is" : "values are"} above it. Baseline ${nf.format(Math.round(c.level))} = average of the values marked used.`,
+      `Neutral = actual ÷ the drivers of that day (season × calendar × weather × price).` +
+      (big && Math.abs(big.factor - 1) > 0.03 ? ` Week ${big.week}'s drivers factor is ${nf2.format(big.factor)} (${why}), so its neutral value differs most from the actual one.` : ""));
+    const levels = R.flatMap((day) => day.map((x) => x.level));
+    const lo = Math.min(...levels), hi = Math.max(...levels);
+    const tint = (v) => `color-mix(in oklab, var(--accent) ${Math.round(12 + 88 * (v - lo) / (hi - lo || 1))}%, var(--surface))`;
+    const box = $("heat");
+    box.replaceChildren(el("span"), ...M.HOURS.map((h) => el("span", "h-lab", h % 2 === 0 ? hh(h) : "")));
+    R.forEach((day, d) => {
+      box.append(el("span", "h-row", DAYS[d]));
+      day.forEach((x, i) => {
+        const btn = el("button");
+        btn.type = "button";
+        btn.style.background = tint(x.level);
+        btn.setAttribute("aria-label", `${slot(d, i)}: ${nf.format(Math.round(x.level))} units`);
+        btn.setAttribute("aria-pressed", String(d === d0 && i === i0));
+        btn.addEventListener("click", () => { state.heatCell = [d, i]; renderBaseline(); });
+        box.append(btn);
+      });
+    });
+    const sc = $("heat-scale"), bar = el("i");
+    bar.style.background = `linear-gradient(90deg, ${tint(lo)}, ${tint(hi)})`;
+    sc.replaceChildren(el("span", null, nf.format(Math.round(lo))), bar, el("span", null, nf.format(Math.round(hi))));
+    $("heat-pick").textContent = `Selected: ${slot(d0, i0)}, ${nf.format(Math.round(c.level))} units. Tap a cell to see its 6 weeks above.`;
+    let nOut = 0, n = 0;
+    R.forEach((day) => day.forEach((x) => { n += x.n; nOut += x.nOut; }));
+    note("base-note", `The rule set aside ${nOut} of ${n} values. The neutral week is ${plain100(cal.B26.levelWeek)} units, the sum of these 72 values; a plan week is this × its drivers (${plain100(cal.B26.weeks[43])} in week 43, ${plain100(cal.B26.weeks[50])} in week 50).`,
+      `With only 6 values the middle ranks understate the spread, so the rule is strict; the baseline is taken around the median, so this barely moves it.`);
+    table("heat-table", ["", ...M.HOURS.map((h) => hh(h))], R.map((day, d) => [DAYS[d], ...day.map((x) => nf.format(Math.round(x.level)))]));
+  }
+
+  /* ---------- charts ---------- */
+  function drawCharts() {
+    if (!last) return;
+    const { res, ready } = last;
+    const s = res.summary;
+    const pHost = $("paint-chart"), brHost = $("bridge-chart"), ciHost = $("ci-chart"), cumHost = $("cum-chart"), hHost = $("hours-chart");
+    if (pHost.offsetParent !== null && fresh(pHost)) paintingChart(pHost, paintRows());
+    if (brHost.offsetParent !== null && fresh(brHost)) {
+      if (!ready) brHost.replaceChildren(el("p", "placeholder", "Enter the redemption rate to see the bridge."));
+      else bridge(brHost, [
+        { name: "Units sold with the coupon", label: "Units sold with the coupon", value: s.couponUnits, kind: "total", tip: `${nf.format(Math.round(s.redemptions))} redemptions × ${nfu.format(state.upr)} units` },
+        { name: "Would have been bought anyway", label: `Would have been bought anyway · ${pct0(s.anyway / s.couponUnits)}`, value: -s.anyway, kind: "delta", tip: `${pct0(s.anyway / s.couponUnits)} of the coupon units` },
+        { name: "Incremental units", label: `Incremental units · ${pct0(s.incremental / s.couponUnits)}`, value: s.incremental, kind: "total", tip: `${pct0(s.incremental / s.couponUnits)} of the coupon units` },
+        { name: "Dip after the coupon", label: `Dip after the coupon · ${pct0(s.dip / s.incremental)}`, value: -s.dip, kind: "delta", tip: `${pct0(s.dip / s.incremental)} of the incremental units` },
+        { name: "Net incremental units", label: `Net incremental units · ${pct0(s.net / s.incremental)}`, value: s.net, kind: "total", strong: true, tip: `${pct0(s.net / s.incremental)} of the incremental units` },
+      ]);
+    }
+    const w25 = cal.all.weeks.filter((x) => x.year === 2025);
+    if (ciHost.offsetParent !== null && fresh(ciHost)) {
+      const k = Math.exp(1.96 * cal.sdW);
+      lineChart(ciHost, {
+        weeks: w25.map((x) => x.week), year: 2025, zero: false, labels: false, pad: 1500, band: [43, 47], bandLabel: "Coupon",
+        valFmt: (v) => nf.format(Math.round(v)), tickFmt: kfmt,
+        series: [
+          { short: "95% interval", kind: "range", lo: w25.map((x) => x.cf / k), hi: w25.map((x) => x.cf * k), values: [], color: "var(--muted)" },
+          { short: "counterfactual", values: w25.map((x) => x.cf), color: "var(--muted)", dash: true },
+          { short: "actual demand", values: w25.map((x) => x.actual), color: "var(--accent)" },
+        ],
+      });
+    }
+    if (cumHost.offsetParent !== null && fresh(cumHost)) {
+      const post = cal.m25.days;
+      const pidx = post.map((p, i) => i);
+      const lastC = post.map((p) => p.week <= 47).lastIndexOf(true);
+      lineChart(cumHost, {
+        weeks: pidx, zero: true, labels: false, band: [0, lastC], bandLabel: "Coupon",
+        showTick: (w, i) => post[i].d === 0, xTick: (i) => "W" + post[i].week,
+        head: (i) => `${DAYS[post[i].d]} ${fmtDate(new Date(post[i].date + "T00:00:00Z"), false)} 2025${post[i].closed ? " · closed" : ""}`, valFmt: (v) => nf.format(Math.round(v)), tickFmt: kfmt,
+        series: [
+          { short: "95% interval", kind: "range", lo: post.map((p) => p.cum - p.cumHalf), hi: post.map((p) => p.cum + p.cumHalf), values: [], color: "var(--accent)" },
+          { short: "incremental so far", values: post.map((p) => p.cum), color: "var(--accent)" },
+        ],
+      });
+    }
+    if (hHost.offsetParent !== null && fresh(hHost)) {
+      const H = cal.hours25;
+      lineChart(hHost, {
+        weeks: M.HOURS, zero: true, labels: false, xTick: (h) => hh(h), head: (h) => `${hh(h)}:00 to ${hh(h + 1)}:00`,
+        tickFmt: (v) => nf.format(v), valFmt: (v) => nf.format(Math.round(v)),
+        series: [
+          { short: "counterfactual", values: H.base, color: "var(--muted)", dash: true },
+          { short: "actual demand", values: H.actual, color: "var(--accent)" },
+        ],
+      });
+    }
+  }
+
+  /* ---------- method ---------- */
+  function renderMethod() {
+    const items = [
+      "Goal: show the marketing team, before a coupon is launched, what it means for logistics: the extra units, the volume and the deadline for supply chain, the pallets in the distribution centre and the shelf in the stores. Extra (incremental) units are the units the coupon adds, which would not have been sold without it. Customers activate the coupon in the Drugstore app and redeem it at the till; the data are store sales.",
+      "Baseline (the rule, per hour): for each weekday and opening hour, 08:00 to 20:00, the same weekday and hour in the last 6 weeks, as neutral demand (demand ÷ the drivers of the day). Ranked high to low, values above the middle value + 2 × the standard deviation of the middle ranks + 2 are outliers; the baseline is the average of the 3 values around the median of the rest. Closed days and closed hours are left out.",
+      `Rolling, then frozen: the window moves with every week (the 6 weeks before that week) and skips weeks of ${B}'s own coupons and the dip after them. During a coupon and its dip it is frozen at the 6 weeks before the coupon, so the coupon cannot leak into its own baseline. With data up to week 42, the 2026 plan uses weeks 37 to 42.`,
+      `Drivers: normal demand of a day = baseline × season × calendar × weather × price. Season: a smooth yearly curve (5 sine/cosine pairs). Calendar: the first and second shopping day before a public holiday and the run-up to Christmas (1 to 24 December). Weather: the daily maximum temperature against its seasonal normal (Karlsruhe). Price: ${B}'s shelf price ÷ the category price index (the volume-weighted average shelf price of men's deo in the Drugstore, weekly), against its usual level. The effects are measured together in one regression on the log of daily demand, on ${cal.trainYears.join(" and ")}, outside ${B}'s own coupons (Drivers card). The weekday and the level are not in the regression: the baseline carries them.`,
+      `Counterfactual: for a day = the sum over its open hours of baseline[weekday, hour] × the drivers of the day. Incremental = actual − counterfactual. The 95% intervals use the day-to-day error of the regression (${pct1(cal.sdIn)}), independent from day to day, and the error of the frozen baseline level (${pct1(cal.sdL)}), one number for the whole coupon and its dip, because the same 6 weeks feed every cell of the frozen baseline; both come from days outside the coupons.`,
+      `Test: the drivers never saw ${M.YEAR}. On its ${cal.holdout.weeks} weeks with data, the counterfactual missed actual weekly demand by ${pct1(cal.holdout.weeklyRms)} (daily ${pct1(cal.holdout.dailyRms)}), bias ${pctSigned(cal.holdout.weeklyBias)}. Over all years, rolling weeks outside the coupons miss by ${pct1(cal.sdW)}.`,
+      `Control brand: ${M.CONTROL} gets the same model (its own drivers, its price against the category index): the cross-check of the control assumption. If the coupon pulled the control's buyers, the control would fall below its own normal in the coupon weeks (2024: ${pctSigned(cal.controlCheck.years[2024].coupon)}, 2025: ${pctSigned(cal.controlCheck.years[2025].coupon)}).`,
+      "Plan: redemptions = app users × your redemption rate at full availability (Einlösequote); units with the coupon = redemptions × units per redemption; incremental = that × incremental share; the dip = incremental × pulled-forward share, spread over the three weeks after the coupon like in 2025. Weekly split: the shape of the 2025 coupon, launch week strongest. The coupon runs 2 or 4 whole weeks, Monday to Saturday.",
+      `Coupon length: past coupons all ran 4 weeks, so the reference redemption rate is a 4-week rate. A 2-week coupon is planned as the first two weeks of a 4-week coupon: the reference rate × ${pct0(M.lengthShare(cal, 2))}, the share of the 2025 coupon's extra units that came in its first two weeks. Week by week it then equals the first two weeks of a 4-week coupon. No 2-week coupon has been run, so this is an assumption: if a shorter coupon makes customers redeem faster, its weekly peak is higher than planned.`,
+      "Demand, not sales: sales ÷ that week's fill rate, so empty shelves last year do not shrink this year's numbers. Expected sales = demand × target fill rate.",
+      `Plan: for the weeks after the data, normal demand = the baseline frozen at weeks 37 to 42 (neutral: ${plain100(cal.B26.levelWeek)} a week) × the drivers the plan knows: the season, ${M.YEAR}'s holiday calendar and the weather scenario. Prices stay at their usual level. Done the same way for 2025's coupon weeks at week 42 of 2025, the plan missed the counterfactual by ${pct0(cal.baseErr25)} on average: that is the cost of what the plan cannot know.`,
+      `Volume to commit: the lead time fixes the volume before any redemption is seen. Commit Q = forecast + z × σ, where the expected shortfall σ × G(z) equals (1 − fill rate) × forecast. σ combines the plan baseline's error in last year's coupon weeks (${pct0(cal.baseErr25)}), the redemption-rate uncertainty and the incremental share's interval.`,
+      "Shelf: each delivery has to cover the selling days until the next one. Assumption: stores get one delivery a week, on Monday. The check takes the heaviest stretch in the coupon weeks for one high-volume store, measured against a normal week of the plan, and compares it with facings × units per facing.",
+      `Start week: a coupon can start in any week of 2026 and has to end by week 52. Weeks 1 to ${M.LAST_DATA} are already in the data, so a coupon there is a what-if on that week's normal demand (the counterfactual, with the drivers as they were); its weekday shares and closed days come from that week.`,
+      `Data: fictional. Hourly sales of ${B} and the control brand from week ${M.WK.order[0][1]} of ${M.WK.order[0][0]} to week ${M.LAST_DATA} of ${M.YEAR}, made from known drivers: a season shaped like the usual Google Trends pattern for "deo" in Germany, +20% and +8% on the two shopping days before a public holiday, +2% per degree above the seasonal normal (real Karlsruhe temperatures), a price elasticity of −2 against a category price index that moves with the control brand's and other brands' promotions, weekly and daily shocks and two coupons (2024 and 2025). Inputs of the model: weekly.csv (sales, fill rates and prices, with the category price index), temperature.csv (Open-Meteo archive), holidays.csv.`,
+      "Test of the measurement: on 200 simulated datasets with the same known drivers and coupons, the measured incremental units were 1 to 8% too high on average (2024: ×1.01, 2025: ×1.08; single runs ranged from ×0.3 to ×1.7 for the smaller coupon), and the 95% intervals held the true value in 87 to 96% of the runs. The dip is hard to measure: on average 55 to 69% of its true size. The drivers came back close to the truth (before a holiday +20.4% and +8.1% against +20% and +8%, weather +2.0% per degree, price elasticity −2.06 against −2.0); their intervals held the true value in 68 to 95% of the runs, too few for weather and price, because the regression treats the days of a week as independent while a week's shock is shared by its six days. The counterfactual of the weeks the drivers never saw missed actual weekly demand by 3.8% on average, with a bias of +0.9%.",
+    ];
+    $("method-list").replaceChildren(...items.map((t) => el("li", null, t)));
+  }
+
+  /* ---------- tabs (hash routing) ---------- */
+  const TABS = ["forecast", "supply-chain", "last-coupon", "method"];
+  function showTab(name) {
+    const tab = TABS.includes(name) ? name : "forecast";
+    for (const t of TABS) {
+      $("panel-" + t).hidden = t !== tab;
+      const btn = $("tab-" + t);
+      btn.setAttribute("aria-selected", String(t === tab));
+      btn.tabIndex = t === tab ? 0 : -1;
+    }
+    drawCharts();
+  }
+  const tabButtons = [...document.querySelectorAll(".tabs button")];
+  tabButtons.forEach((btn, i) => {
+    btn.addEventListener("click", () => {
+      const name = btn.dataset.tab;
+      if (location.hash !== "#" + name) location.hash = name; else showTab(name);
+    });
+    btn.addEventListener("keydown", (ev) => {
+      if (ev.key !== "ArrowRight" && ev.key !== "ArrowLeft") return;
+      ev.preventDefault();
+      const next = tabButtons[(i + (ev.key === "ArrowRight" ? 1 : tabButtons.length - 1)) % tabButtons.length];
+      next.focus();
+      next.click();
+    });
+  });
+  window.addEventListener("hashchange", () => showTab(location.hash.slice(1)));
+
+  let raf = 0;
+  const ro = new ResizeObserver(() => { cancelAnimationFrame(raf); raf = requestAnimationFrame(drawCharts); });
+  ["paint-chart", "bridge-chart", "ci-chart", "cum-chart", "hours-chart"].forEach((id) => ro.observe($(id)));
+
+  syncControls();
+  update();
+  showTab(location.hash.slice(1));
+})();
+</script>

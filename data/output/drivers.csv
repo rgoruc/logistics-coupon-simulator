@@ -1,0 +1,13 @@
+brand,driver,meaning,coefficient,half_width_95,effect_pct,fitted_on,days_in_fit,residual_sd
+test,pre1,First shopping day before a public holiday,0.18053,0.02018,19.79,2024 2025,513,0.03681
+test,pre2,Second shopping day before a public holiday,0.07445,0.01642,7.73,2024 2025,513,0.03681
+test,xmas,Run-up to Christmas (full effect on 23 December),0.04422,0.03274,4.52,2024 2025,513,0.03681
+test,anomaly,Weather: per degree above the seasonal normal,0.02051,0.00084,2.07,2024 2025,513,0.03681
+test,z,Price: per log point of the brand's price against the category price index (0.05 = the category about 5% cheaper),-2.09026,0.21817,-87.63,2024 2025,513,0.03681
+test,trend,Trend: per year (not a driver of the plan; the baseline carries the level),0.03998,0.00687,4.08,2024 2025,513,0.03681
+control,pre1,First shopping day before a public holiday,0.16895,0.01915,18.41,2024 2025,598,0.04067
+control,pre2,Second shopping day before a public holiday,0.07446,0.01629,7.73,2024 2025,598,0.04067
+control,xmas,Run-up to Christmas (full effect on 23 December),0.06603,0.03366,6.83,2024 2025,598,0.04067
+control,anomaly,Weather: per degree above the seasonal normal,0.02115,0.00084,2.14,2024 2025,598,0.04067
+control,z,Price: per log point of the brand's price against the category price index (0.05 = the category about 5% cheaper),-2.03696,0.09145,-86.96,2024 2025,598,0.04067
+control,trend,Trend: per year (not a driver of the plan; the baseline carries the level),-0.01657,0.0066,-1.64,2024 2025,598,0.04067

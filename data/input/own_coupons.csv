@@ -1,0 +1,3 @@
+year,start_week,full_weeks,partial_week,dip_weeks,discount,note
+2024,18,4,,3,0.10,Spring app coupon
+2025,43,4,47,3,0.20,Autumn app coupon; the last week runs Monday and Tuesday only
