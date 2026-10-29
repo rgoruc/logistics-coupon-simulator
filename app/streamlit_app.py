@@ -98,8 +98,9 @@ def ddmmm(d: dt.date, year: bool = False) -> str:
 
 
 @st.cache_resource(show_spinner="Fitting the drivers, the baseline and the counterfactual ...")
-def get_model():
-    """The rule is fixed (config.py: the last 6 weeks); the drivers are fitted on the years before the plan year."""
+def get_model(inputs_stamp: str):
+    """The rule is fixed (config.py: the last 6 weeks); the drivers are fitted on the years before the plan year.
+    inputs_stamp: the contents of data/input, so the cache refreshes when an input file changes."""
     data = load(ROOT / config.DATA_DIR, config.OPENING_HOURS)
     return calibrate(data, RuleSettings.from_config(config), config.REFERENCE_COUPON_YEAR)
 
@@ -122,7 +123,15 @@ def eff_pm(cal, key: str, x: float = 1.0) -> str:
 plan_box = st.sidebar.container()
 supply_box = st.sidebar.container()
 
-cal = get_model()
+def inputs_stamp() -> str:
+    import hashlib
+    h = hashlib.md5()
+    for f in sorted((ROOT / config.DATA_DIR).glob("*.csv")):
+        h.update(f.name.encode()); h.update(f.read_bytes())
+    return h.hexdigest()
+
+
+cal = get_model(inputs_stamp())
 data = cal.data
 py, lw = data.plan_year(), data.last_data_week()
 D = default_scenario(cal)
