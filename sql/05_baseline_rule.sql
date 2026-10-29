@@ -1,8 +1,8 @@
 /* =====================================================================================================
-   05  Your baseline rule, written once as a view
+   05  The baseline rule, written once as a view
    -----------------------------------------------------------------------------------------------------
-   Input:  table rule_input (target_year, target_week, weekday, hour, src_pos, value)
-           = for one target week, one weekday and hour: the values of the window weeks.
+   Input:  table rule_input (target_year, target_week, weekday, src_pos, value)
+           = for one target week and one weekday: the values of the window weeks.
    Output: view rule_values_v = every value with its rank and the rule's verdict
            ('outlier', 'used', 'not used'); the baseline of a cell = AVG(value) WHERE status = 'used'.
 
@@ -21,7 +21,6 @@ CREATE TABLE rule_input (
   target_year INT,
   target_week INT,
   weekday     INT,
-  hour        INT,
   src_pos     INT,
   value       FLOAT
 );
@@ -30,14 +29,14 @@ DROP VIEW IF EXISTS rule_values_v;
 CREATE VIEW rule_values_v AS
 WITH ranked AS (
   SELECT i.*,
-         ROW_NUMBER() OVER (PARTITION BY target_year, target_week, weekday, hour ORDER BY value DESC, src_pos ASC) AS rnk,
-         COUNT(*)     OVER (PARTITION BY target_year, target_week, weekday, hour) AS n
+         ROW_NUMBER() OVER (PARTITION BY target_year, target_week, weekday ORDER BY value DESC, src_pos ASC) AS rnk,
+         COUNT(*)     OVER (PARTITION BY target_year, target_week, weekday) AS n
   FROM rule_input i
 ),
 trimmed AS (
   SELECT r.*,
          MAX(CASE WHEN r.rnk = FLOOR(r.n / 2.0) + 1 THEN r.value END)
-           OVER (PARTITION BY r.target_year, r.target_week, r.weekday, r.hour) AS mid,
+           OVER (PARTITION BY r.target_year, r.target_week, r.weekday) AS mid,
          CASE WHEN ROUND(r.n / (p.trim_divisor * 1.0)) > 1 THEN ROUND(r.n / (p.trim_divisor * 1.0)) ELSE 1 END AS k
   FROM ranked r
   CROSS JOIN model_params p
@@ -45,15 +44,15 @@ trimmed AS (
 middle_mean AS (
   SELECT t.*,
          AVG(CASE WHEN t.rnk > t.k AND t.rnk <= t.n - t.k THEN t.value END)
-           OVER (PARTITION BY t.target_year, t.target_week, t.weekday, t.hour) AS m,
+           OVER (PARTITION BY t.target_year, t.target_week, t.weekday) AS m,
          SUM(CASE WHEN t.rnk > t.k AND t.rnk <= t.n - t.k THEN 1 ELSE 0 END)
-           OVER (PARTITION BY t.target_year, t.target_week, t.weekday, t.hour) AS n_middle
+           OVER (PARTITION BY t.target_year, t.target_week, t.weekday) AS n_middle
   FROM trimmed t
 ),
 middle_var AS (
   SELECT mm.*,
          AVG(CASE WHEN mm.rnk > mm.k AND mm.rnk <= mm.n - mm.k THEN (mm.value - mm.m) * (mm.value - mm.m) END)
-           OVER (PARTITION BY mm.target_year, mm.target_week, mm.weekday, mm.hour) AS var_middle
+           OVER (PARTITION BY mm.target_year, mm.target_week, mm.weekday) AS var_middle
   FROM middle_mean mm
 ),
 thresholds AS (
@@ -65,7 +64,7 @@ thresholds AS (
 outliers AS (
   SELECT t.*,
          SUM(CASE WHEN t.value > t.threshold THEN 1 ELSE 0 END)
-           OVER (PARTITION BY t.target_year, t.target_week, t.weekday, t.hour) AS n_out
+           OVER (PARTITION BY t.target_year, t.target_week, t.weekday) AS n_out
   FROM thresholds t
 ),
 center AS (
@@ -75,7 +74,7 @@ center AS (
   FROM outliers o
   CROSS JOIN model_params p
 )
-SELECT target_year, target_week, weekday, hour, src_pos, value, rnk, n, mid, threshold, n_out, c,
+SELECT target_year, target_week, weekday, src_pos, value, rnk, n, mid, threshold, n_out, c,
        CASE
          WHEN rnk <= n_out THEN 'outlier'
          WHEN rnk >= CASE WHEN n_out + 1 > c - hw THEN n_out + 1 ELSE c - hw END

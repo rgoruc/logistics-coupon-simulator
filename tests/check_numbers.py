@@ -19,7 +19,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from model import (calibrate, daily, day_drivers, deadline, default_scenario, forecast, hourly, intervals, load,  # noqa: E402
+from model import (calibrate, daily, day_drivers, deadline, default_scenario, forecast, intervals, load,  # noqa: E402
                    reference_rate, shelf_check, share_for, start_weeks)
 from model.mathutil import js_round  # noqa: E402
 from model.baseline import RuleSettings  # noqa: E402
@@ -77,11 +77,11 @@ def python_numbers() -> dict:
         "rows3w13": rows_of(res3, ["week", "coupon", "baseline", "incremental", "dip", "demand"]),
         "what3": {"summary": summ(s3, ["weeks", "couponDemand", "couponBaseline", "commit"]),
                   "daily14": daily(cal, sc3, res3, 14), "daily15": daily(cal, sc3, res3, 15),
-                  "hourly14Thu": hourly(cal, sc3, res3, 14, 3)["rows"], "shelfMon": shelf_check(cal, sc3, res3, [0], 6),
+                  "shelfMon": shelf_check(cal, sc3, res3, [0], 6),
                   "startWeeks4": start_weeks(data, 4), "drivers14": [day_drivers(cal, 14, d) for d in range(6)]},
         "warm48": {"summary": summ(s4, ["weeks", "couponDemand", "couponBaseline", "commit"]),
                    "rows": [{k: r[k] for k in ["week", "baseline", "incremental", "dip", "demand"]} for r in res4.rows if r["week"] >= 43],
-                   "daily52": daily(cal, sc4, res4, 52), "hourly52Thu": hourly(cal, sc4, res4, 52, 3)["rows"],
+                   "daily52": daily(cal, sc4, res4, 52),
                    "drivers52": [day_drivers(cal, 52, d, 3.0) for d in range(6)], "shelfMon": shelf_check(cal, sc4, res4, [0], 6)},
         "shelfMonDefault": shelf_check(cal, sc, res, [0], 6),
         "cal": {"sdIn": cal.sd_in, "sdD": cal.sd_d, "sdL": cal.sd_l, "sdW": cal.sd_w, "oosDays": cal.oos_days, "trainYears": cal.train_years,
@@ -91,14 +91,14 @@ def python_numbers() -> dict:
                         "cfCoupon": m26.cf_coupon, "lost": m26.lost} if m26 else None,
                 "m24": {"extra": m24.extra, "dip": m24.dip, "extraHalf": m24.extra_half},
                 "profile": {"full": cal.profile_full, "partial": cal.profile_partial}, "tail": cal.tail, "lastChance": cal.last_chance,
-                "dipWeights": cal.dip_weights, "frNormal": cal.fr_normal, "hours25": cal.hours_ref,
+                "dipWeights": cal.dip_weights, "frNormal": cal.fr_normal,
                 "past": [{k: p.get(k) for k in ["year", "discount", "mau", "rateObs", "fillRate", "rateFull", "couponUnitsFull", "upr",
                                                 "extra", "dip", "extraHalf", "measured"]} for p in cal.past],
                 "fitRate": vars(cal.fit_rate), "fitShare": vars(cal.fit_share), "upr": cal.upr, "dipDefault": cal.dip_default,
                 "shareRelSE": cal.share_rel_se,
                 "B26": {"levelWeek": cal.plan.level_week, "week": cal.plan.week, "weeks": [cal.plan.weeks[w] for w in data.plan_weeks()],
                         "days": [cal.plan.days[w] for w in data.plan_weeks()], "parts": [cal.plan.parts[w] for w in data.plan_weeks()],
-                        "dayShare": cal.plan.day_share, "hourShare": cal.plan.hour_share, "window": [f"{a}-{b}" for a, b in cal.plan.window]},
+                        "dayShare": cal.plan.day_share, "window": [f"{a}-{b}" for a, b in cal.plan.window]},
                 "planErr": cal.plan_err, "baseBias25": cal.base_bias_ref, "baseErr25": cal.base_err_ref,
                 "drivers": drv(cal.drivers), "driversControl": drv(cal.drivers_control),
                 "holdout": {"year": cal.holdout["year"], "weeks": cal.holdout["weeks"], "days": cal.holdout["days"], "weeklyRms": cal.holdout["weekly_rms"],
@@ -107,10 +107,10 @@ def python_numbers() -> dict:
                                  "weeks": cal.control_check["weeks"], "sdWControl": cal.control_check["sd_w_control"]},
                 "seasonCurve": cal.season_curve, "anomalySd": cal.anomaly_sd},
         "weather": {"coef": cal.weather.coef, "lastDay": cal.weather.last_day.isoformat()},
-        "feats": [{"date": s_, "open": f.open, "closeHour": f.close_hour, "pre1": f.pre1, "pre2": f.pre2, "xmas": f.xmas, "anomaly": f.anomaly,
+        "feats": [{"date": s_, "open": f.open, "closeHour": f.close_hour, "pre1": f.pre1, "pre2": f.pre2, "xmas": f.xmas, "short": f.short, "anomaly": f.anomaly,
                    "z": f.z, "zc": f.zc} for s_ in feats for f in [cal.feats[dt.date.fromisoformat(s_)]]],
-        "planCells": [[{"level": c.level, "threshold": c.threshold, "nOut": c.n_out, "n": c.n, "status": c.status} for c in row] for row in lv.L.cells],
-        "sample": cal.sample(4, 9), "weeks": weeks, "days": days, "weeksControl": weeks_c,
+        "planCells": [{"level": c.level, "threshold": c.threshold, "nOut": c.n_out, "n": c.n, "status": c.status} for c in lv.L.cells],
+        "sample": cal.sample(4), "weeks": weeks, "days": days, "weeksControl": weeks_c,
         "reference": reference_rate(cal, 0.2), "shareFor20": share_for(cal, 0.2),
         "scenario": {"discount": sc.discount, "startWeek": sc.start_week, "fullWeeks": sc.full_weeks,
                      "mau": sc.mau, "rate": sc.rate, "upr": sc.upr, "incShare": sc.inc_share, "pullShare": sc.pull_share,
@@ -121,7 +121,7 @@ def python_numbers() -> dict:
         "summary": {**{k: s[k] for k in ["weeks", "redemptions", "couponUnits", "anyway", "incremental", "dip", "net", "dipOutside",
                                          "couponDemand", "couponBaseline", "couponSales", "couponLost", "commit", "price"]},
                     "startDate": s["startDate"].isoformat(), "deadline": deadline(s["startDate"], 96).isoformat()},
-        "daily43": daily(cal, sc, res, 43), "hourly43Sat": hourly(cal, sc, res, 43, 5)["rows"],
+        "daily43": daily(cal, sc, res, 43),
         "shelf": sh, "intervals": intervals([0, 2, 4]),
     }
 

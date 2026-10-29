@@ -28,7 +28,7 @@ for p in (str(ROOT), str(APP)):
 import planner_charts as charts  # noqa: E402
 import config  # noqa: E402
 from model import (COUPON_LENGTHS, CONTROL, DAYS, NAME, calibrate, daily, day_drivers, deadline, default_scenario,  # noqa: E402
-                   forecast, hourly, intervals, iso_monday, length_share, load, reference_rate, share_for,
+                   forecast, intervals, iso_monday, length_share, load, reference_rate, share_for,
                    shelf_check, normal_demand, span_label, start_weeks)
 from model.baseline import RuleSettings  # noqa: E402
 from model.mathutil import js_round  # noqa: E402
@@ -101,7 +101,7 @@ def ddmmm(d: dt.date, year: bool = False) -> str:
 def get_model(inputs_stamp: str):
     """The rule is fixed (config.py: the last 6 weeks); the drivers are fitted on the years before the plan year.
     inputs_stamp: the contents of data/input, so the cache refreshes when an input file changes."""
-    data = load(ROOT / config.DATA_DIR, config.OPENING_HOURS)
+    data = load(ROOT / config.DATA_DIR)
     return calibrate(data, RuleSettings.from_config(config), config.REFERENCE_COUPON_YEAR)
 
 
@@ -210,7 +210,7 @@ ASSUMPTIONS = [
         "at the store.",
         "Region: Baden-Württemberg, 1 distribution centre and 450 stores, open 08:00 to 20:00, Monday to Saturday. "
         "Closed on Sundays and public holidays.",
-        f"Data: fictional hourly store sales from week {first_wk[1]} of {first_wk[0]} to week {last_wk[1]} of {last_wk[0]} "
+        f"Data: fictional daily store sales from week {first_wk[1]} of {first_wk[0]} to week {last_wk[1]} of {last_wk[0]} "
         "mimicking the seasonality shown in Google Trends Search for keyword \"deo\" in Germany (Data source: Google Trends, google.com/trends).",
     ]),
     ("Prices", [
@@ -235,13 +235,14 @@ ASSUMPTIONS = [
         f"Dip after the coupon: {pull}% of the incremental units " + ("(average of the past coupons)" if pull == pull_d else
                                                                       f"(your setting; past coupons: {pull_d}%)")
         + f", spread over the 3 weeks after it as in {ry}.",
-        f"Weekly split: the shape of the {ry} coupon, launch week strongest. Hourly split: the normal hourly pattern.",
+        f"Weekly split: the shape of the {ry} coupon, launch week strongest.",
     ]),
     ("Normal demand (without the coupon)", [
-        f"Baseline rule, fixed: same weekday and hour in the last {cal.rule.window_weeks} weeks. A value is an outlier above the "
+        f"Baseline rule, fixed: same weekday in the last {cal.rule.window_weeks} weeks, on daily demand. A value is an outlier above the "
         f"middle value + {cal.rule.sd_multiplier:g} × standard deviation + {cal.rule.threshold_constant:g}. The baseline is the "
         f"average of the {2 * cal.rule.half_window + 1} values around the median.",
-        "Normal demand of a day = baseline × season × calendar (shopping days before a holiday, the run-up to Christmas) × weather × "
+        "Normal demand of a day = baseline × season × calendar (shopping days before a holiday, the run-up to Christmas, 24 December "
+        "closing at 14:00) × weather × "
         f"price (against the category price index). The effects are measured on {and_list([str(y) for y in cal.train_years])} and tested on "
         f"{py} (Drivers section in the Forecast tab).",
         f"Weeks 1 to {lw}: the drivers as they were (the counterfactual). Weeks {lw + 1} to 52: baseline of {weeks_text(cal.plan.window)} "
@@ -346,7 +347,7 @@ with tab_f:
     # ---- the drivers of normal demand ----
     st.subheader(f"Drivers of normal demand · {NAME}, measured on {and_list([str(y) for y in cal.train_years])}, tested on {py}")
     st.markdown(
-        "Normal demand of a day = the baseline for that weekday and hour × season × calendar × weather × price. "
+        "Normal demand of a day = the baseline for that weekday × season × calendar × weather × price. "
         f"The effects are measured together, in one regression on the log of daily demand ({cal.drivers.fit.n:,} days of "
         f"{and_list([str(y) for y in cal.train_years])}, outside {NAME}'s own coupons), so a hot week in July is not mistaken for the "
         "season. The weekday and the level are not drivers: the baseline rule carries them, 6 weeks at a time.")
@@ -365,6 +366,8 @@ with tab_f:
          "Effect on normal demand": eff(cal, "pre2"), "95%": eff_pm(cal, "pre2"), "In the plan weeks": "23 December"},
         {"Driver": "Run-up to Christmas", "What it measures": "1 to 24 December, rising to the full effect on 23 December",
          "Effect on normal demand": eff(cal, "xmas"), "95%": eff_pm(cal, "xmas"), "In the plan weeks": "as measured"},
+        {"Driver": "Short day", "What it measures": "24 December, the store closes at 14:00",
+         "Effect on normal demand": eff(cal, "short"), "95%": eff_pm(cal, "short"), "In the plan weeks": "24 December"},
         {"Driver": "Weather", "What it measures": "per 1 °C the daily maximum is above the seasonal normal",
          "Effect on normal demand": eff(cal, "anomaly"), "95%": eff_pm(cal, "anomaly"),
          "In the plan weeks": f"normal, cold or warm (±{a_sd:.1f} °C: {eff(cal, 'anomaly', -a_sd)} / {eff(cal, 'anomaly', a_sd)})"},
@@ -409,10 +412,6 @@ with tab_l:
                f"was {pct_signed(chk['years'][y_ref]['coupon'])} in {y_ref} and {pct_signed(chk['years'][y_last]['coupon'])} in {y_last}, "
                f"within its weekly error, so no sign of that. Competitors' promotions, the control's included, enter {NAME} through the "
                f"category price index: when the index is 5% lower, {NAME} sells {eff(cal, 'z', -math.log(0.95))}.")
-    st.subheader("By hour, full coupon days")
-    H = cal.hours_ref
-    show(charts.hours_chart(data.hours, H["base"], H["actual"]))
-    st.caption(f"Average of {H['days']} full coupon days. The gap between the lines is the coupon's incremental demand by hour.")
     st.subheader("Past coupons")
     st.dataframe(pd.DataFrame([{
         "Coupon": f"{p['year']} · W{p['weeks']}", "Discount": f"{p['discount']:.0%}", "App users": f"{p['mau']:,.0f}",
@@ -424,25 +423,27 @@ with tab_l:
 
 # ---------------- Baseline rule ----------------
 with tab_b:
-    st.subheader(f"Baseline: your rule, last {cal.rule.window_weeks} weeks")
+    st.subheader(f"Baseline: the rule, last {cal.rule.window_weeks} weeks")
     st.markdown(
-        "For each weekday and opening hour the rule takes the same weekday and hour in the last weeks as neutral demand: the hour's "
-        "demand ÷ the drivers of its day, so a hot day or a day before a holiday does not count more than it should. Ranked high to "
+        "For each weekday the rule takes the same weekday in the last weeks as neutral demand: the day's "
+        "demand ÷ the drivers of that day, so a hot day or a day before a holiday does not count more than it should. Ranked high to "
         "low, a value is an **outlier** when it is above the middle "
         f"value + {cal.rule.sd_multiplier:g} × the standard deviation of the middle ranks + {cal.rule.threshold_constant:g}. The baseline "
         f"is the average of the values within ±{cal.rule.half_window} {'rank' if cal.rule.half_window == 1 else 'ranks'} of the median "
         f"of the values that are left. Closed days are left out. Shown: the frozen baseline of the plan, {weeks_text(cal.plan.window)}.")
-    c1, c2 = st.columns(2)
-    day = c1.selectbox("Weekday of the example", DAYS[:6], index=4)
-    hour = c2.selectbox("Hour of the example", data.hours, index=data.hours.index(17) if 17 in data.hours else 0,
-                        format_func=lambda h: f"{h:02d}:00–{h + 1:02d}:00")
-    d0, i0 = DAYS.index(day), data.hours.index(hour)
-    show(charts.baseline_heatmap([[x.level for x in row] for row in cal.plan.cells], data.hours, (d0, i0)))
-    smp = cal.sample(d0, i0)
-    cell = cal.plan.cells[d0][i0]
+    st.dataframe(pd.DataFrame([{"Weekday": DAYS[d], "Baseline units": round(x.level), "Values": x.n, "Outliers": x.n_out}
+                               for d, x in enumerate(cal.plan.cells)]), hide_index=True)
+    n_out = sum(x.n_out for x in cal.plan.cells)
+    n_all = sum(x.n for x in cal.plan.cells)
+    st.caption(f"The neutral week is {h100(cal.plan.level_week)} units, the sum of these 6 values; a plan week is each day's value × "
+               f"its drivers. The rule set aside {n_out} of {n_all} values as outliers.")
+    day = st.selectbox("Weekday of the example", DAYS[:6], index=4)
+    d0 = DAYS.index(day)
+    smp = cal.sample(d0)
+    cell = cal.plan.cells[d0]
     ranked = sorted([x for x in smp if x["adj"] is not None], key=lambda x: -x["adj"])
     rank = {x["week"]: k + 1 for k, x in enumerate(ranked)}
-    st.markdown(f"**Example: {day} {hour:02d}:00–{hour + 1:02d}:00**")
+    st.markdown(f"**Example: {day}, the 6 weeks behind it**")
     st.dataframe(pd.DataFrame([{
         "Week": x["week"], "Date": x["date"], "Actual demand": None if x["raw"] is None else round(x["raw"]),
         "Drivers": None if x["factor"] is None else round(x["factor"], 3),
@@ -450,11 +451,7 @@ with tab_b:
         hide_index=True)
     st.caption("Neutral = actual ÷ the drivers of that day (season × calendar × weather × price). "
                f"Threshold {cell.threshold:,.0f}: {cell.n_out} {'value is' if cell.n_out == 1 else 'values are'} above it. "
-               f"Baseline {cell.level:,.0f} = average of the values marked used. The weekly baseline is the sum of the 72 cells: "
-               f"{h100(cal.plan.level_week)}.")
-    n_out = sum(x.n_out for row in cal.plan.cells for x in row)
-    n_all = sum(x.n for row in cal.plan.cells for x in row)
-    st.caption(f"The rule set aside {n_out} of {n_all} values as outliers.")
+               f"Baseline {cell.level:,.0f} = average of the values marked used.")
 
 # ---------------- Supply chain ----------------
 with tab_s:
@@ -497,7 +494,7 @@ with tab_s:
                 "the coupon. " if ready else "")
                + f"Last year's coupon was not in the replenishment forecast: distribution centre orders jumped from {dc(c0.start - 1)} to "
                f"{dc(c0.start)} units when it started and fell to {dc(min(c0.post))} after it ended.")
-    st.subheader("Daily and hourly plan")
+    st.subheader("Daily plan")
     wk = st.selectbox("Week", [r["week"] for r in view], index=[r["week"] for r in view].index(start),
                       format_func=lambda w: f"Week {w}" + (" · coupon" if w in s["weeks"] else ""))
     days = daily(cal, sc, res, wk)
@@ -527,8 +524,7 @@ with tab_s:
 
     def day_label(d: int) -> str:
         f = cal.feats[dt.date.fromisoformat(days[d]["date"])]
-        short = f.open and f.close_hour <= data.hours[-1]  # a short day (24 December closes at 14:00)
-        return f"{DAYS[d]} {days[d]['date']}" + (f" · until {f.close_hour:02d}:00" if short else "")
+        return f"{DAYS[d]} {days[d]['date']}" + (f" · until {f.close_hour:02d}:00" if f.short else "")  # 24 December closes at 14:00
 
     st.markdown(f"**The drivers of each day, week {wk}**" + (" (as they were)" if wk <= lw else f" (plan: {weather.lower()} weather)"))
     st.dataframe(pd.DataFrame([
@@ -543,13 +539,9 @@ with tab_s:
                   "price index that week (below 1.00 when other brands were on promotion). " if wk <= lw else
                   "Prices are not known in advance, so the plan keeps them at their usual level (1.00); "
                   "weather at its seasonal normal. ")
-               + (("Calendar above 1.00: " + ", ".join(f"{DAYS[d]} {p['calendar']:.2f}" for d, p in cal_days)
-                   + " (a shopping day before a public holiday, or the run-up to Christmas).") if cal_days else "No public holiday nearby this week."))
-    hd = st.radio("Day of the hourly plan", DAYS[:6], index=5, horizontal=True)
-    hrs = hourly(cal, sc, res, wk, DAYS.index(hd))
-    st.dataframe(pd.DataFrame([{"Hour": f"{r['hour']:02d}–{r['hour'] + 1:02d}", "Baseline": round(r["baseline"]),
-                                "Incremental − dip": round(r["incremental"] - r["dip"]), "Demand": round(r["demand"]),
-                                "Share of the day": pct(r["share"])} for r in hrs["rows"]]), hide_index=True)
+               + (("Calendar not 1.00: " + ", ".join(f"{DAYS[d]} {p['calendar']:.2f}" for d, p in cal_days)
+                   + " (a shopping day before a public holiday, the run-up to Christmas, or 24 December, when the store closes at "
+                   "14:00).") if cal_days else "No public holiday nearby this week."))
     st.subheader("Shelf check, high-volume store")
     if ready:
         sh = shelf_check(cal, sc, res)
@@ -601,26 +593,26 @@ with tab_m:
         "and the deadline for supply chain, the weekly volume in the distribution centre and the shelf in the stores. Extra (incremental) "
         "units are the units the coupon adds, which would not have been sold without it. Customers activate the coupon in the "
         "Drugstore app and redeem it at the till; the data are store sales.",
-        f"**Baseline (your rule, per hour):** for each weekday and opening hour, the same weekday and hour in the last "
+        f"**Baseline (the rule, on daily demand):** for each weekday, the same weekday in the last "
         f"{cal.rule.window_weeks} weeks, as neutral demand (demand ÷ the drivers of the day). Values above the middle value + "
         f"{cal.rule.sd_multiplier:g} × the standard deviation of the middle ranks + {cal.rule.threshold_constant:g} are outliers; the "
         f"baseline is the average of the values within ±{cal.rule.half_window} {'rank' if cal.rule.half_window == 1 else 'ranks'} of "
-        "the median of the rest. Closed days and closed hours are left out.",
+        "the median of the rest. Closed days are left out.",
         f"**Rolling, then frozen:** the window moves with every week (the {cal.rule.window_weeks} weeks before that week) and skips "
         f"weeks of {NAME}'s own coupons and the dip after them. During a coupon and its dip it is frozen at the weeks before the "
         f"coupon, so the coupon cannot leak into its own baseline. With data up to week {lw}, the {py} plan uses "
         f"{weeks_text(cal.plan.window)}.",
         "**Drivers:** normal demand of a day = baseline × season × calendar × weather × price. Season: a "
-        "smooth yearly curve (5 sine/cosine pairs). Calendar: the first and second shopping day before a public holiday and the run-up "
-        "to Christmas (1 to 24 December). Weather: the daily maximum temperature against its seasonal normal (Karlsruhe). Price: "
+        "smooth yearly curve (5 sine/cosine pairs). Calendar: the first and second shopping day before a public holiday, the run-up "
+        "to Christmas (1 to 24 December) and the short day (24 December, the store closes at 14:00). Weather: the daily maximum temperature against its seasonal normal (Karlsruhe). Price: "
         f"{NAME}'s shelf price ÷ the category price index (the volume-weighted average shelf price of men's deo, weekly), against "
         "its usual level. "
         f"The effects are measured together in one regression on the log of daily demand, on {yrs}, outside {NAME}'s own coupons "
         "(Drivers section in the Forecast tab). The weekday and the level are not in the regression: the baseline carries them.",
-        "**Counterfactual:** for a day = the sum over its open hours of baseline[weekday, hour] × the drivers of the day. "
+        "**Counterfactual:** for a day = baseline[weekday] × the drivers of the day. "
         f"Incremental = actual − counterfactual. The 95% intervals use the day-to-day error of the regression ({pct(cal.sd_in)}), "
         f"independent from day to day, and the error of the frozen baseline level ({pct(cal.sd_l)}), one number for the whole coupon "
-        "and its dip, because the same 6 weeks feed every cell of the frozen baseline; both come from days outside the coupons.",
+        "and its dip, because the same 6 weeks feed every weekday of the frozen baseline; both come from days outside the coupons.",
         f"**Test:** the drivers never saw {py}. On its {cal.holdout['weeks']} weeks with data, the "
         f"counterfactual missed actual weekly demand by {pct(cal.holdout['weekly_rms'])} (daily {pct(cal.holdout['daily_rms'])}), "
         f"bias {pct_signed(cal.holdout['weekly_bias'])}. Over all years, rolling weeks outside the coupons miss by {pct(cal.sd_w)}.",
@@ -651,20 +643,21 @@ with tab_m:
         f"**Start week:** a coupon can start in any week of {py} and has to end by week 52. Weeks 1 to {lw} are already in the data, "
         "so a coupon there is a what-if on that week's normal demand (the counterfactual, with the drivers as they were); its weekday "
         "shares and closed days come from that week.",
-        f"**Data:** fictional. Hourly sales of {NAME} and the control brand from week {first_wk[1]} of {first_wk[0]} to week {lw} of "
+        f"**Data:** fictional. Daily sales of {NAME} and the control brand from week {first_wk[1]} of {first_wk[0]} to week {lw} of "
         f"{py}, made from known drivers: a season shaped like the usual Google Trends pattern for \"deo\" in Germany, +20% and +8% on "
-        "the two shopping days before a public holiday, +2% per degree above the seasonal normal (real Karlsruhe temperatures), a "
+        "the two shopping days before a public holiday, 24 December with 43.5% of a normal day's demand (the store closes at 14:00), "
+        "+2% per degree above the seasonal normal (real Karlsruhe temperatures), a "
         "price elasticity of −2 against a category price index that moves with the control brand's and other brands' promotions, "
         "weekly and daily shocks and two coupons (2024 and 2025). Inputs of the model: weekly.csv (sales, fill rates and prices, with the category "
         "price index), temperature.csv (Open-Meteo archive), holidays.csv.",
-        "**Test of the measurement:** on 200 simulated datasets with the same known drivers and coupons, the measured incremental units were 1 to 8% too "
-        "high on average (2024: ×1.01, 2025: ×1.08; single runs ranged from ×0.3 to ×1.7 for the smaller coupon), "
-        "and the 95% intervals held the true value in 87 to 96% of the runs. The dip is hard to measure: on average 55 to 69% "
-        "of its true size. The drivers came back close to the truth (before a holiday +20.4% and +8.1% against +20% and +8%, "
-        "weather +2.0% per degree, price elasticity −2.06 against −2.0); their intervals held the true value in 68 to 95% of "
-        "the runs, too few for weather and price, because the regression treats the days of a week as independent while a "
-        "week's shock is shared by its six days. The counterfactual of the weeks the drivers never saw missed actual weekly "
-        "demand by 3.8% on average, with a bias of +0.9%.",
+        "**Test of the measurement:** on 200 simulated datasets with the same known drivers and coupons, the measured incremental "
+        "units were ×0.99 (2024) and ×1.07 (2025) of the true ones on average (single runs ranged from ×0.1 to ×1.7 for the smaller "
+        "coupon), and the 95% intervals held the true value in 89 to 97% of the runs. The dip is hard to measure: on average 58 to 70% "
+        "of its true size. The drivers came back close to the truth (before a holiday +20.5% and +8.1% against +20% and +8%, short "
+        "day −57.0% against −56.5%, weather +2.0% per degree, price elasticity −2.05 against −2.0); their intervals held the true "
+        "value in 69 to 95% of the runs, too few for weather and price, because the regression treats the days of a week as "
+        "independent while a week's shock is shared by its six days. The counterfactual of the weeks the drivers never saw missed "
+        "actual weekly demand by 3.8% on average, with a bias of +0.8%.",
     ]))
 
 # ---------------- assumptions, at the end ----------------

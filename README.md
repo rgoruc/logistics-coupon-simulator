@@ -55,7 +55,7 @@ python html/build_html.py           # rebuilds html/coupon_planner.html from dat
 |---|---|---|
 | discount (10, 20 or 30%), coupon length (2 or 4 weeks), start week (any week of 2026), store delivery day (Monday), app users, redemption rate (Einlösequote), units per redemption, incremental share, dip share, fill rate, lead time, delivery days, prices (Deo Test Brand, Deo Control Brand, market average) | `data/input/plan_assumptions.csv` (empty value = default from past coupons or the data), or the sliders in the app | `python run_model.py`, `python html/build_html.py` |
 | the baseline rule: window weeks (6), outlier threshold (2 × sd + 2), ranks around the median | `config.py` (the app has no settings for it) | `python run_model.py`; in SQL: `sql/02_parameters.sql` |
-| the data | replace `data/input/hourly_sales.csv` and `weekly.csv` with the same columns; `holidays.csv` and `temperature.csv` have to cover the same days; `weekly.csv` carries the category price index | `python run_model.py` |
+| the data | replace `data/input/daily_sales.csv` and `weekly.csv` with the same columns; `holidays.csv` and `temperature.csv` have to cover the same days; `weekly.csv` carries the category price index | `python run_model.py` |
 | past coupons, own coupons in the data, shelf | `past_coupons.csv`, `own_coupons.csv`, `shelf.csv` | `python run_model.py` |
 | the method itself | the Python files in `model/` (each file starts with an explanation) | `python run_model.py`, the app picks it up |
 
@@ -63,28 +63,31 @@ CSV files can be edited in VS Code or Excel. If Excel saves them with semicolons
 
 ## 4. How the model works
 
-- **Baseline (your rule, per weekday and opening hour):** the same weekday and hour in the last 6 weeks, as neutral
-  demand (demand ÷ the drivers of the day), ranked high to low. Outlier threshold = value at rank floor(n/2)+1 + 2 ×
+- **Data: daily.** `daily_sales.csv` holds the units sold per day and brand (closed days have no row). A single deo
+  sells too few units per hour and store for hourly cells; daily sales are the level the logistics questions need.
+- **Baseline (the rule, per weekday, on daily demand):** the same weekday in the last 6 weeks, as neutral demand
+  (demand ÷ the drivers of the day), ranked high to low. Outlier threshold = value at rank floor(n/2)+1 + 2 ×
   standard deviation of the middle ranks + 2. Baseline = average of the 3 values around the median of the values that
-  are not outliers. Closed days and closed hours (24 December from 14:00) are left out.
+  are not outliers. Closed days are left out.
 - **Rolling, then frozen:** the window rolls with every week and skips weeks of Deo Test Brand's own coupons and the dip
   after them. During a coupon and its dip it is frozen at the 6 weeks before the coupon.
 - **Drivers:** normal demand of a day = baseline × season × calendar × weather × price.
   Season: a smooth yearly curve (5 sine/cosine pairs). Calendar: the first and second shopping day before a public
-  holiday (`data/input/holidays.csv`) and the run-up to Christmas (1 to 24 December). Weather: the daily maximum
+  holiday (`data/input/holidays.csv`), the run-up to Christmas (1 to 24 December) and the short day (24 December, the
+  store closes at 14:00). Weather: the daily maximum
   temperature against its seasonal normal (`temperature.csv`, Karlsruhe, Open-Meteo archive). Price: Deo Test Brand's
   shelf price ÷ the category price index (`category_price` in `weekly.csv`: the volume-weighted average shelf price of
   men's deo in the Drugstore, weekly), against its usual level. The effects are measured together in one regression on the log of daily demand (`model/drivers.py`),
   on 2024 and 2025, outside Deo Test Brand's own coupons; 2026 is the test. The weekday and the level are not in the
   regression: the baseline carries them. Fitted values: `data/output/drivers.csv`; the factors of every day:
   `day_factors.csv`.
-- **Counterfactual:** for a day = the sum over its open hours of baseline[weekday, hour] × the drivers of the day.
+- **Counterfactual:** for a day = baseline[weekday] × the drivers of the day.
   **Incremental units** = demand − counterfactual in the coupon weeks; the **dip** = the same in the weeks after.
   Demand = sales ÷ fill rate. The 95% intervals use the day-to-day error of the regression and the error of the
   frozen baseline level (one number for the whole coupon and its dip); both come from days outside the coupons.
 - **Control brand:** Deo Control Brand gets the same model (its own baseline and drivers, its own price against the
   category index): the cross-check of the control assumption. In the coupon weeks the control stayed on its normal
-  path (2024: 0.0%, 2025: −0.4%).
+  path (2024: −0.2%, 2025: −1.2%).
 - **Start week:** any week of 2026; the coupon has to end by week 52. Weeks 1 to 42 are already in the data, so a
   coupon there is a what-if on that week's normal demand (its counterfactual, with the drivers as they were).
 - **Store delivery:** assumption: one delivery a week, on Monday. The shelf check compares the heaviest stretch
@@ -101,8 +104,8 @@ CSV files can be edited in VS Code or Excel. If Excel saves them with semicolons
 - **Volume to commit:** Q = forecast + z × σ, with z chosen so that the expected shortfall matches the target fill rate.
 - **Actual against the model:** for the weeks with data the year chart also shows actual demand (sales ÷ fill rate); its
   gap to the normal demand is actual minus the model. The daily plan of a week with data shows the same per day.
-- **Default plan:** the coupon starts in week 1 (`start_week` in `data/input/plan_assumptions.csv`), a what-if on that
-  week's data; the page starts from the reference redemption rate, so the coupon shows at once.
+- **Default plan:** the coupon starts in week 48 (`start_week` in `data/input/plan_assumptions.csv`); the page starts
+  from the reference redemption rate, so the coupon shows at once.
 
 The model's files, in the order the calculation runs: `model/data.py` → `drivers.py` → `baseline.py` →
 `counterfactual.py` → `calibrate.py` → `plan.py` → `supply.py` → `outputs.py`.
@@ -112,12 +115,12 @@ The model's files, in the order the calculation runs: `model/data.py` → `drive
 Run the files in order: `01_create_and_load_tables.sql` (creates the tables and loads the CSVs; the file explains
 the upload) → `02_parameters.sql` → `03_demand.sql` → `04_windows.sql` → `05_baseline_rule.sql` →
 `06_control_baseline.sql` → `07_test_brand_baseline.sql` → `08_counterfactual.sql`. `09_look_at_results.sql` has queries
-to look at the results. Your rule is written once, as the view `rule_values_v` in step 05; steps 06 and 07 use it
+to look at the results. The rule is written once, as the view `rule_values_v` in step 05; steps 06 and 07 use it
 for the control brand and for Deo Test Brand.
 
 The drivers are fitted in Python and come into SQL as one factor per day: after `python run_model.py` upload
-`data/output/day_factors.csv` together with the three input files (step 01). Step 07 divides every hour by the
-drivers of its day before the rule (neutral values), step 08 multiplies the baseline by the drivers of the target
+`data/output/day_factors.csv` together with the three input files (step 01). Step 07 divides every day by its
+drivers before the rule (neutral values), step 08 multiplies the baseline by the drivers of the target
 day (the counterfactual), measures the coupons, runs the control cross-check and builds the plan weeks from the
 frozen baseline and the plan factor of every day. Steps 02 to 08 use only standard SQL, so `sql/run_sql_locally.py`
 runs the same files with SQLite (part of Python) and compares every week, the coupon measurements, the control
@@ -135,15 +138,15 @@ no coupon in 2026 so far). Changes to `model/` or `config.py` do not reach the p
 
 - The data are fictional, made by `simulation/generate_data.py` with seed 37 from known drivers: a season shaped like
   the usual Google Trends pattern for "deo" in Germany, +20% and +8% on the two shopping days before a public holiday,
-  +2% per degree above the seasonal normal (the real Karlsruhe temperatures in `data/input/temperature.csv`,
-  Open-Meteo archive), a price elasticity of −2 against the category price index, weekly and daily shocks, Poisson
-  counts per hour and two coupons (2024 weeks 18-21 and 2025 weeks 43-47; none in 2026 so far). The category price index is made up too: 12% of the category's volume is Deo Test
+  24 December with 43.5% of a normal day's demand (the store closes at 14:00), +2% per degree above the seasonal
+  normal (the real Karlsruhe temperatures in `data/input/temperature.csv`, Open-Meteo archive), a price elasticity of
+  −2 against the category price index, weekly and daily shocks, Poisson counts per day and two coupons (2024 weeks 18-21 and 2025 weeks 43-47; none in 2026 so far). The category price index is made up too: 12% of the category's volume is Deo Test
   Brand (€1.00), 10% the control brand (€2.00, −20% in three weeks of 2025 and three of 2026) and 78% other brands
   (on promotion 4 to 7% below normal in 6 or 7 weeks a year); each brand's volume rises when it is on promotion. The
   index is €1.50 at normal prices and between €1.42 and €1.47 in promotion weeks. The true effects are in
-  `simulation/truth_seed_37.json`. Incremental units, true and measured: 2024 coupon 8,140 and 9,124, 2025 coupon
-  23,921 and 24,168. Drivers, true and measured: before a holiday +20% / +19.8% and
-  +8% / +7.7%, weather +2.0% / +2.1% per degree, price elasticity −2.0 / −2.09. The data run from week 1 of 2024 to
+  `simulation/truth_seed_37.json`. Incremental units, true and measured: 2024 coupon 8,140 and 9,922, 2025 coupon
+  23,921 and 24,207. Drivers, true and measured: before a holiday +20% / +20.3% and +8% / +7.8%, short day −56.5% /
+  −57.0%, weather +2.0% / +2.1% per degree, price elasticity −2.0 / −2.11. The data run from week 1 of 2024 to
   week 42 of 2026.
 - `simulation/google_trends_deo_de.csv`: weekly search interest for "deo" in Germany, past 5 years, retrieved
   28 October 2026. Data source: Google Trends (https://www.google.com/trends). Only the generator uses it, for the
@@ -154,13 +157,13 @@ no coupon in 2026 so far). Changes to `model/` or `config.py` do not reach the p
 - `python simulation/validate.py --seeds 200` runs the model on 200 datasets with the same drivers and coupons and
   reports the bias of the measured coupons and drivers and how often the 95% intervals held the true value.
   Latest run (`python simulation/validate.py --seeds 200`): on 200 simulated datasets with the same known drivers and
-  coupons, the measured incremental units were 1 to 8% too high on average (2024: ×1.01, 2025: ×1.08;
-  single runs ranged from ×0.3 to ×1.7 for the smaller coupon), and the 95% intervals held the true value in 88 to
-  96% of the runs. The dip is hard to measure: on average 55 to 69% of its true size. The drivers came back close to
-  the truth (before a holiday +20.4% and +8.1% against +20% and +8%, weather +2.0% per degree, price elasticity −2.06
-  against −2.0); their intervals held the true value in 68 to 95% of the runs, too few for weather and price, because
-  the regression treats the days of a week as independent while a week's shock is shared by its six days. The
-  counterfactual of the weeks the drivers never saw missed actual weekly demand by 3.8% on average, with a bias of
-  +1.0%.
-- `python tests/check_numbers.py` compares about 15,500 numbers of the Python model with the HTML page's JavaScript
+  coupons, the measured incremental units were ×0.99 (2024) and ×1.07 (2025) of the true ones on average (single runs
+  ranged from ×0.1 to ×1.7 for the smaller coupon), and the 95% intervals held the true value in 89 to 97% of the
+  runs. The dip is hard to measure: on average 58 to 70% of its true size. The drivers came back close to the truth
+  (before a holiday +20.5% and +8.1% against +20% and +8%, short day −57.0% against −56.5%, weather +2.0% per degree,
+  price elasticity −2.05 against −2.0); their intervals held the true value in 69 to 95% of the runs, too few for
+  weather and price, because the regression treats the days of a week as independent while a week's shock is shared by
+  its six days. The counterfactual of the weeks the drivers never saw missed actual weekly demand by 3.8% on average,
+  with a bias of +0.8%.
+- `python tests/check_numbers.py` compares about 14,000 numbers of the Python model with the HTML page's JavaScript
   model (`tests/reference_from_html.json`). If you change the model on purpose, differences are expected.

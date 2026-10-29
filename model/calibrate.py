@@ -69,8 +69,7 @@ class PlanBaseline:
     parts: dict           # plan week -> the driver factors of the week (demand-weighted)
     week: float           # a typical plan week (average of the plan weeks), the shelf check's normal week
     day_share: list       # weekday shares of the neutral week (6 values)
-    hour_share: list      # per weekday, the hourly shares of the neutral baseline
-    cells: list
+    cells: list           # the rule's result per weekday
 
 
 @dataclass
@@ -100,7 +99,6 @@ class Calibration:
     dip_weights: list
     fr_normal: float
     extra_on_sales_ref: float
-    hours_ref: dict
     past: list
     fit_rate: LineFit
     fit_share: LineFit
@@ -119,18 +117,18 @@ class Calibration:
     anomaly_sd: float          # sd of the weekly mean temperature anomaly: the cold / warm scenario
     extra: dict = field(default_factory=dict)
 
-    def sample(self, d: int, i: int) -> list:
-        """The worked example of the rule: the plan window, one weekday and hour."""
+    def sample(self, d: int) -> list:
+        """The worked example of the rule: the plan window, one weekday."""
         lv = self.plan.levels
         out = []
         for (y, w) in lv.win:
             f = self.feats[day_date(y, w, d)]
-            P = self.data.hour_demand(y, "test", w, d)
-            ok = P is not None and f.open and self.data.hours[i] < f.close_hour
+            P = self.data.day_demand(y, "test", w, d)
+            ok = P is not None and f.open
             F = self.drivers.factor(f) if ok else None
-            out.append({"year": y, "week": w, "date": day_key(y, w, d), "raw": P[i] if ok else None, "factor": F,
-                        "parts": self.drivers.parts(f) if ok else None, "adj": P[i] / F if ok else None,
-                        "status": lv.L.cells[d][i].status.get(week_key(y, w))})
+            out.append({"year": y, "week": w, "date": day_key(y, w, d), "raw": P if ok else None, "factor": F,
+                        "parts": self.drivers.parts(f) if ok else None, "adj": P / F if ok else None,
+                        "status": lv.L.cells[d].status.get(week_key(y, w))})
         return out
 
 
@@ -175,7 +173,7 @@ def _plan_days(lv: Levels, drv: Drivers, feats: dict, y: int, weeks: list) -> tu
             if d == 6 or not f.open:
                 vals.append(0.0)
                 continue
-            v = lv.day_level(d, f.close_hour) * plan_factor(drv, f)
+            v = lv.day_level(d) * plan_factor(drv, f)
             vals.append(v)
             p = drv.parts(f, 0.0)
             for k in DRIVER_NAMES:
@@ -228,23 +226,6 @@ def calibrate(data: Data, rule: RuleSettings = RuleSettings(), reference_year: i
     fr_normal = mean(r["fr"] for r in wk_oos)
     extra_on_sales = total(m_ref.wk[w]["sales"] - m_ref.wk[w]["cf"] * fr_normal for w in m_ref.weeks)
 
-    # the reference coupon by hour: actual demand against the counterfactual on full coupon days
-    nh = len(data.hours)
-    hours = {"base": [0.0] * nh, "actual": [0.0] * nh, "days": 0}
-    for p in m_ref.days:
-        if p["week"] not in C.full or p["closed"]:
-            continue
-        hd_ = data.hour_demand(C.year, "test", p["week"], p["d"])
-        hours["days"] += 1
-        for i in range(nh):
-            hours["base"][i] += p["cf"] * lv_ref.hour_share[p["d"]][i]
-            hours["actual"][i] += hd_[i]
-    hours["base"] = [v / hours["days"] for v in hours["base"]]
-    hours["actual"] = [v / hours["days"] for v in hours["actual"]]
-    hours["extra"] = [v - hours["base"][i] for i, v in enumerate(hours["actual"])]
-    hours["baseShare"] = [v / total(hours["base"]) for v in hours["base"]]
-    hours["extraShare"] = [v / total(hours["extra"]) for v in hours["extra"]]
-
     # the control brand against its own counterfactual: a cross-check of the control assumption
     checks = {}
     for c in data.own:
@@ -264,7 +245,7 @@ def calibrate(data: Data, rule: RuleSettings = RuleSettings(), reference_year: i
     lv26 = all_.levels(py, pw)
     weeks26, days26, parts26 = _plan_days(lv26, drv, feats, py, data.plan_weeks())
     plan = PlanBaseline(lv26, lv26.L.week, lv26.win, weeks26, days26, parts26, mean(weeks26.values()), lv26.day_share,
-                        lv26.hour_share, lv26.L.cells)
+                        lv26.L.cells)
     # the same plan one year earlier: what it missed in the coupon weeks (weather, prices, shocks)
     lv25 = all_.levels(C.year, C.start)
     weeks25, _, _ = _plan_days(lv25, drv, feats, C.year, m_ref.weeks)
@@ -306,7 +287,7 @@ def calibrate(data: Data, rule: RuleSettings = RuleSettings(), reference_year: i
         train_years=train_years, sd_in=sd_in, sd_d=sd_d, sd_l=sd_l, sd_w=sd_w, oos_days=len(oos), all=all_, all_control=all_c,
         ref=m_ref, measurements=measurements, lv_ref=lv_ref, profile_full=profile_full, profile_partial=profile_partial,
         tail=tail, last_chance=last_chance, dip_weights=dip_weights, fr_normal=fr_normal, extra_on_sales_ref=extra_on_sales,
-        hours_ref=hours, past=past, fit_rate=fit_rate, fit_share=fit_share, measured=measured, upr=mean(p["upr"] for p in past),
+        past=past, fit_rate=fit_rate, fit_share=fit_share, measured=measured, upr=mean(p["upr"] for p in past),
         dip_default=mean(p["dip"] for p in past), share_rel_se=(measured["extraHalf"] / 1.96) / measured["extra"],
         plan=plan, plan_window=lv26, plan_err=plan_err, base_bias_ref=mean(plan_err), base_err_ref=rms(plan_err),
         holdout=holdout, control_check=control_check, season_curve=season_curve, anomaly_sd=anomaly_sd)

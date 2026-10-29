@@ -32,32 +32,32 @@ SELECT week, ROUND(season_factor, 4) AS season_factor, ROUND(calendar_factor, 4)
 FROM plan_weeks_counterfactual
 ORDER BY week;
 
--- the plan's weeks 51 and 52 day by day: the run-up to Christmas, the short day, the holidays
+-- the plan's weeks 51 and 52 day by day: the run-up to Christmas, the short day (24 December), the holidays
 SELECT sales_date, day_name, close_hour, ROUND(season_factor, 3) AS season, ROUND(calendar_factor, 3) AS calendar,
        ROUND(neutral_level) AS neutral_level, ROUND(counterfactual) AS normal_demand
 FROM plan_days_counterfactual
 WHERE week IN (51, 52)
 ORDER BY sales_date;
 
--- your rule at work: the 6 values of one cell of the plan baseline (Friday 17:00-18:00)
-SELECT v.weekday, v.hour, a.src_year, a.src_week, a.sales_date,
+-- the rule at work: the 6 values behind the plan baseline of one weekday (Friday)
+SELECT v.weekday, a.src_year, a.src_week, a.sales_date,
        ROUND(a.demand, 1) AS demand, ROUND(a.drivers_factor, 3) AS drivers_factor, ROUND(a.neutral_value, 1) AS neutral_value,
        v.rnk, ROUND(v.threshold, 1) AS threshold, v.status
 FROM test_rule_values v
 JOIN test_neutral_values a
   ON a.target_year = v.target_year AND a.target_week = v.target_week
- AND a.weekday = v.weekday AND a.hour = v.hour AND a.src_pos = v.src_pos
+ AND a.weekday = v.weekday AND a.src_pos = v.src_pos
 JOIN plan_summary p
   ON p.plan_year = v.target_year AND p.first_plan_week = v.target_week
-WHERE v.weekday = 5 AND v.hour = 17
+WHERE v.weekday = 5
 ORDER BY v.rnk;
 
--- the plan baseline as a weekday x hour table
-SELECT c.weekday, c.hour, ROUND(c.baseline_level, 1) AS baseline_level, c.n, c.n_out
-FROM test_baseline_cells c
+-- the plan baseline per weekday
+SELECT c.weekday, ROUND(c.l_day, 1) AS baseline_level, c.n, c.n_out
+FROM test_baseline_day c
 JOIN plan_summary p
   ON p.plan_year = c.target_year AND p.first_plan_week = c.target_week
-ORDER BY c.weekday, c.hour;
+ORDER BY c.weekday;
 
 -- how many values the rule set aside as outliers, per target week
 SELECT target_year, target_week, SUM(CASE WHEN status = 'outlier' THEN 1 ELSE 0 END) AS outliers, COUNT(*) AS values_seen

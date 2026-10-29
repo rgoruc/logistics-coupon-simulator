@@ -95,14 +95,13 @@ def coupon_measurement(cal: Calibration) -> pd.DataFrame:
 
 
 def baseline_cells(cal: Calibration) -> pd.DataFrame:
-    """The plan's neutral baseline per weekday and hour (frozen window)."""
+    """The plan's neutral baseline per weekday (frozen window)."""
     lv = cal.plan_window
     rows = []
     for d in range(6):
-        for i, h in enumerate(cal.data.hours):
-            c = lv.L.cells[d][i]
-            rows.append({"weekday": DAYS[d], "hour": f"{h:02d}:00-{h + 1:02d}:00", "neutral_baseline": _r(c.level, 2),
-                         "threshold": _r(c.threshold, 2), "values": c.n, "outliers": c.n_out})
+        c = lv.L.cells[d]
+        rows.append({"weekday": DAYS[d], "neutral_baseline": _r(c.level, 2), "threshold": _r(c.threshold, 2),
+                     "values": c.n, "outliers": c.n_out})
     return pd.DataFrame(rows)
 
 
@@ -110,14 +109,13 @@ def baseline_rule_detail(cal: Calibration) -> pd.DataFrame:
     """Every value the rule saw for the plan baseline: actual demand, adjusted value, rank and the rule's verdict."""
     rows = []
     for d in range(6):
-        for i, h in enumerate(cal.data.hours):
-            smp = cal.sample(d, i)
-            ranked = sorted([x for x in smp if x["adj"] is not None], key=lambda x: -x["adj"])
-            rank = {x["week"]: k + 1 for k, x in enumerate(ranked)}
-            for x in smp:
-                rows.append({"weekday": DAYS[d], "hour": f"{h:02d}:00", "year": x["year"], "week": x["week"], "date": x["date"],
-                             "demand": _r(x["raw"], 2), "drivers_factor": _r(x["factor"], 4),
-                             "neutral_value": _r(x["adj"], 2), "rank": rank.get(x["week"]), "rule": x["status"]})
+        smp = cal.sample(d)
+        ranked = sorted([x for x in smp if x["adj"] is not None], key=lambda x: -x["adj"])
+        rank = {x["week"]: k + 1 for k, x in enumerate(ranked)}
+        for x in smp:
+            rows.append({"weekday": DAYS[d], "year": x["year"], "week": x["week"], "date": x["date"],
+                         "demand": _r(x["raw"], 2), "drivers_factor": _r(x["factor"], 4),
+                         "neutral_value": _r(x["adj"], 2), "rank": rank.get(x["week"]), "rule": x["status"]})
     df = pd.DataFrame(rows)
     df["rank"] = df["rank"].astype("Int64")
     return df
@@ -168,7 +166,8 @@ def full_year(cal: Calibration, sc: Scenario, res: Forecast) -> pd.DataFrame:
 
 
 DRIVER_LABELS = {"pre1": "First shopping day before a public holiday", "pre2": "Second shopping day before a public holiday",
-                 "xmas": "Run-up to Christmas (full effect on 23 December)", "anomaly": "Weather: per degree above the seasonal normal",
+                 "xmas": "Run-up to Christmas (full effect on 23 December)",
+                 "short": "Short day: 24 December, the store closes at 14:00", "anomaly": "Weather: per degree above the seasonal normal",
                  "z": "Price: per log point of the brand's price against the category price index (0.05 = the category about 5% cheaper)",
                  "trend": "Trend: per year (not a driver of the plan; the baseline carries the level)"}
 
@@ -193,7 +192,7 @@ def day_factors(cal: Calibration) -> pd.DataFrame:
     """The drivers of every day from the first data day to the end of the plan year, the input of the SQL steps:
     each factor of Deo Test Brand, their product (drivers_factor), the plan's version of the product (plan_factor:
     season and calendar only, normal weather, normal prices), the product for the control brand (its own drivers)
-    and the hours the store is open. The products carry
+    and whether the store is open (close_hour 14 on the short day, 24 December). The products carry
     12 decimals because the SQL divides and multiplies by them; the single factors are rounded for reading."""
     rows = []
     drv, drv_c = cal.drivers, cal.drivers_control
@@ -206,7 +205,8 @@ def day_factors(cal: Calibration) -> pd.DataFrame:
                      "drivers_factor": round(drv.factor(f), 12), "plan_factor": round(plan_factor(drv, f), 12),
                      "control_drivers_factor": round(drv_c.factor(f), 12),
                      "temperature_anomaly": None if f.anomaly is None else round(f.anomaly, 2), "relative_price_test": round(f.z, 4),
-                     "pre_holiday_1": int(f.pre1), "pre_holiday_2": int(f.pre2), "christmas_ramp": round(f.xmas, 4)})
+                     "pre_holiday_1": int(f.pre1), "pre_holiday_2": int(f.pre2), "christmas_ramp": round(f.xmas, 4),
+                     "short_day": int(f.short)})
     return pd.DataFrame(rows)
 
 

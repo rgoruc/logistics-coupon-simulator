@@ -3,7 +3,7 @@
    -----------------------------------------------------------------------------------------------------
    The drivers (season, calendar, weather, price against the category price index) are fitted in Python
    (model/drivers.py, a regression on the years before the plan year) and come into SQL as one factor per
-   day: the table day_factors of step 01. The numbers below are your baseline rule; they match config.py.
+   day: the table day_factors of step 01. The numbers below are the baseline rule; they match config.py.
    ===================================================================================================== */
 
 DROP TABLE IF EXISTS model_params;

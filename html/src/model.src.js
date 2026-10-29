@@ -1,11 +1,11 @@
-/* Logistics Coupon Simulator, model v12 (source of html/coupon_planner.html; build with html/build_html.py).
+/* Logistics Coupon Simulator, model v13 (source of html/coupon_planner.html; build with html/build_html.py).
    Fictional case: the Drugstore (Baden-Württemberg, 450 stores) runs an app coupon on Deo Test Brand, activated in the
    Drugstore app and redeemed at the till. Goal: the incremental units caused by the coupon and what they mean for logistics.
-   - Normal demand of a day = baseline[weekday, hour] x season x calendar x weather x price (the brand's price against the
+   - Normal demand of a day = baseline[weekday] x season x calendar x weather x price (the brand's price against the
      volume-weighted category price index).
      The drivers are measured together in one regression on the log of daily demand, fitted on the years before the
      plan year, outside Deo Test Brand's own coupons (the plan year's weeks with data are the test).
-   - Baseline: the same-weekday rule (last 6 weeks, outlier rule, median window), per hour 08:00-20:00, on neutral
+   - Baseline: the same-weekday rule (last 6 weeks, outlier rule, median window) on daily demand, on neutral
      values (demand / the drivers of the day). The window rolls with every week, skips weeks of Deo Test Brand's own
      coupons and the dip after them, and is frozen during a coupon at the 6 weeks before it.
    - The control brand (Deo Control Brand) gets the same model: the cross-check of the control assumption.
@@ -15,7 +15,7 @@
 const Model = (() => {
   const NAME = "Deo Test Brand", CONTROL = "Deo Control Brand";
   const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-  const HOURS = [8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]; // opening hours 08:00-20:00
+  const STORE_CLOSE = 20; // the usual closing hour (20:00); 24 December closes at 14:00
   const PLAN_WEEKS = [43, 44, 45, 46, 47, 48, 49, 50, 51, 52]; // weeks after the data
   const YEAR_WEEKS = Array.from({ length: 52 }, (_, i) => i + 1); // a coupon can start in any week and has to end by week 52
   const YEAR = 2026, LAST_DATA = 42;
@@ -35,7 +35,7 @@ const Model = (() => {
   // All three are measured from the data with the counterfactual.
   const PAST = __PAST__;
   const WEEKLY_CSV = `__WEEKLY__`;
-  const HOURLY_CSV = `__HOURLY__`;
+  const DAILY_CSV = `__DAILY__`;               // date;test;control (units sold)
   const TEMPERATURE_CSV = `__TEMPERATURE__`;  // date;tmax (Karlsruhe, Open-Meteo archive)
   const HOLIDAYS_CSV = `__HOLIDAYS__`;        // date;name;kind;close_hour (Baden-Württemberg)
   const SEASON_HARMONICS = 5, TEMP_HARMONICS = 2;
@@ -71,31 +71,27 @@ const Model = (() => {
     }
     return { map, order };
   }
-  function parseHourly(csv) {
+  function parseDaily(csv) {
     const lines = csv.trim().split(/\r?\n/), out = new Map();
     for (const line of lines.slice(1)) {
-      const c = line.split(";"), v = c.slice(1).map(Number);
-      out.set(c[0], { test: v.slice(0, 12), control: v.slice(12, 24) });
+      const c = line.split(";");
+      out.set(c[0], { test: Number(c[1]), control: Number(c[2]) });
     }
     return out;
   }
   const WK = parseWeekly(WEEKLY_CSV);
-  const HOURLY = parseHourly(HOURLY_CSV);
+  const DAILY = parseDaily(DAILY_CSV);
   const row = (y, w) => WK.map.get(wk(y, w));
   const fr = (y, g, w) => row(y, w)[`fr_${g}`];
   const price = (y, g, w) => row(y, w)[`price_${g}`];
-  const HD = new Map(), DD = new Map();
-  const hourDemand = (y, g, w, d) => {
-    const k = `${g}|${y}|${w}|${d}`;
-    if (!HD.has(k)) { const r = HOURLY.get(dayKey(y, w, d)); HD.set(k, r ? r[g].map((v) => v / fr(y, g, w)) : null); }
-    return HD.get(k);
-  };
+  const DD = new Map();
+  // demand of a day = sales / fill rate of the week; null when the store was closed
   const dayDemand = (y, g, w, d) => {
     const k = `${g}|${y}|${w}|${d}`;
-    if (!DD.has(k)) { const h = hourDemand(y, g, w, d); DD.set(k, h ? sum(h) : null); }
+    if (!DD.has(k)) { const r = DAILY.get(dayKey(y, w, d)); DD.set(k, r ? r[g] / fr(y, g, w) : null); }
     return DD.get(k);
   };
-  const daySales = (y, g, w, d) => { const r = HOURLY.get(dayKey(y, w, d)); return r ? sum(r[g]) : null; };
+  const daySales = (y, g, w, d) => { const r = DAILY.get(dayKey(y, w, d)); return r ? r[g] : null; };
 
   // position of every week in time (weeks with data first; plan weeks of 2026 follow the last data week)
   const ORDER = [...WK.order, ...PLAN_WEEKS.map((w) => [YEAR, w])];
@@ -117,11 +113,11 @@ const Model = (() => {
     return out;
   }
 
-  /* The baseline rule (from the minute-level TV baseline), here per hour: the same weekday and hour in the last 6 weeks.
-     Rank high to low. Outlier = above the value at rank floor(n/2)+1 (rank 31 of 60) + 2 x the standard deviation of
-     the middle ranks (11-50 of 60: the top and bottom sixth left out) + 2. Baseline = average of the values around the
-     median of the values that are not outliers: rank n - floor((n - outliers)/2), +/- 1 (+/- 2 with 60 values).
-     Closed days and closed hours are left out. items: [{ key, value }] */
+  /* The baseline rule, per weekday: the same weekday in the last 6 weeks (n values).
+     Rank high to low. Outlier = above the value at rank floor(n/2)+1 + 2 x the standard deviation of the middle ranks
+     (the top and bottom sixth left out) + 2. Baseline = average of the values around the median of the values that are
+     not outliers: rank n - floor((n - outliers)/2), +/- 1 (+/- 2 with 20 values or more).
+     Closed days are left out. items: [{ key, value }] */
   function robustLevel(items) {
     const v = items.filter((it) => it.value != null).sort((a, b) => b.value - a.value);
     const n = v.length;
@@ -221,7 +217,8 @@ const Model = (() => {
       if (kind === "short") short.set(date, Number(close) || 14); else closed.add(date);
     }
     const isOpen = (d) => d.getUTCDay() !== 0 && !closed.has(iso(d));
-    const closeHour = (d) => (isOpen(d) ? (short.get(iso(d)) ?? HOURS[HOURS.length - 1] + 1) : 0);
+    const closeHour = (d) => (isOpen(d) ? (short.get(iso(d)) ?? STORE_CLOSE) : 0);
+    const isShort = (d) => isOpen(d) && short.has(iso(d));
     // how many closed holidays (Monday to Saturday) have this day as their first or second shopping day before
     const preHoliday = (d) => {
       let n1 = 0, n2 = 0;
@@ -237,7 +234,7 @@ const Model = (() => {
       }
       return [n1, n2];
     };
-    return { closed, short, names, isOpen, closeHour, preHoliday };
+    return { closed, short, names, isOpen, closeHour, isShort, preHoliday };
   })();
 
   // weather: the daily maximum against its seasonal normal (intercept + 2 sine/cosine pairs through all days)
@@ -266,7 +263,7 @@ const Model = (() => {
       const zc = has ? Math.log(price(iy, "control", iw) / price(iy, "category", iw)) - Z_NORM_C : 0;
       const [n1, n2] = CAL.preHoliday(d);
       out.set(iso(d), { date: d, weekday: (d.getUTCDay() + 6) % 7, open: CAL.isOpen(d), closeHour: CAL.closeHour(d), frac: yearFraction(d),
-        season: fourier(yearFraction(d), SEASON_HARMONICS), pre1: n1, pre2: n2, xmas: christmasRamp(d), anomaly: WEATHER.anomaly(d),
+        season: fourier(yearFraction(d), SEASON_HARMONICS), pre1: n1, pre2: n2, xmas: christmasRamp(d), short: CAL.isShort(d) ? 1 : 0, anomaly: WEATHER.anomaly(d),
         z, zc, tYears: Math.round((t - first.getTime()) / DAY_MS) / 365.25 });
     }
     return out;
@@ -275,10 +272,10 @@ const Model = (() => {
 
   /* ---------------- the drivers regression ---------------- */
   const COLUMNS = [...[0, 1, 2, 3, 4, 5].map((d) => `wd${d}`), ...Array.from({ length: SEASON_HARMONICS }, (_, k) => [`s${k + 1}c`, `s${k + 1}s`]).flat(),
-    "pre1", "pre2", "xmas", "anomaly", "z", "trend"];
+    "pre1", "pre2", "xmas", "short", "anomaly", "z", "trend"];
   const designRow = (f, brand) => {
     const r = [0, 1, 2, 3, 4, 5].map((d) => (f.weekday === d ? 1 : 0));
-    r.push(...f.season, f.pre1, f.pre2, f.xmas, f.anomaly ?? 0, brand === "test" ? f.z : f.zc, f.tYears);
+    r.push(...f.season, f.pre1, f.pre2, f.xmas, f.short, f.anomaly ?? 0, brand === "test" ? f.z : f.zc, f.tYears);
     return r;
   };
   function fitDrivers(brand) {
@@ -287,7 +284,7 @@ const Model = (() => {
       if (!TRAIN_YEARS.includes(yy) || (brand === "test" && ownOf(yy, ww))) continue;
       for (let d = 0; d < 6; d++) {
         const f = feat(yy, ww, d);
-        if (!f.open || f.closeHour <= HOURS[HOURS.length - 1] || f.anomaly == null) continue;
+        if (!f.open || f.anomaly == null) continue;
         const P = dayDemand(yy, brand, ww, d);
         if (!P) continue;
         rows.push(designRow(f, brand)); y.push(Math.log(P));
@@ -303,30 +300,29 @@ const Model = (() => {
       const a = anomaly === undefined ? f.anomaly : anomaly;
       return {
         season: Math.exp(seasonLog(f.frac)),
-        calendar: Math.exp(c("pre1") * f.pre1 + c("pre2") * f.pre2 + c("xmas") * f.xmas),
+        calendar: Math.exp(c("pre1") * f.pre1 + c("pre2") * f.pre2 + c("xmas") * f.xmas + c("short") * f.short),
         weather: Math.exp(c("anomaly") * (a || 0)),
         price: Math.exp(c("z") * (brand === "test" ? f.z : f.zc)),
       };
     };
     const factor = (f, anomaly) => { const p = parts(f, anomaly); let out = 1; for (const k of DRIVER_NAMES) out *= p[k]; return out; };
-    const effects = () => ["pre1", "pre2", "xmas", "anomaly", "z", "trend"].map((key) => ({ key, coef: c(key), se: se(key) }));
+    const effects = () => ["pre1", "pre2", "xmas", "short", "anomaly", "z", "trend"].map((key) => ({ key, coef: c(key), se: se(key) }));
     return { brand, fit, names, seasonCoef, seasonMean, seasonLog, parts, factor, effects, coef: c, se };
   }
   // the drivers of a day as the plan knows them: season and calendar, weather at the given anomaly, the rest unknown
   const planFactor = (drv, f, anomaly = 0) => { const p = drv.parts(f, anomaly); return p.season * p.calendar * Math.exp(drv.coef("anomaly") * anomaly); };
 
-  /* Levels of one window: the baseline rule on neutral values (demand / the drivers of the day), per weekday and hour */
+  /* Levels of one window: the baseline rule on neutral values (demand / the drivers of the day), per weekday */
   function levelsFor(win, brand, drv) {
-    const cells = [0, 1, 2, 3, 4, 5].map((d) => HOURS.map((h, i) => robustLevel(win.map(([y, w]) => {
-      const f = feat(y, w, d), hd = hourDemand(y, brand, w, d);
-      const ok = hd != null && f.open && h < f.closeHour;
-      return { key: wk(y, w), value: ok ? hd[i] / drv.factor(f) : null };
-    }))));
-    const day = cells.map((r) => sum(r.map((c) => c.level)));
+    const cells = [0, 1, 2, 3, 4, 5].map((d) => robustLevel(win.map(([y, w]) => {
+      const f = feat(y, w, d), P = dayDemand(y, brand, w, d);
+      return { key: wk(y, w), value: P != null && f.open ? P / drv.factor(f) : null };
+    })));
+    const day = cells.map((c) => c.level);
     const week = sum(day);
-    const L = { cells, day, week, dayShare: day.map((v) => v / week), hourShare: cells.map((r, d) => r.map((c) => c.level / day[d])) };
-    const dayLevel = (d, closeHour) => sum(cells[d].filter((c, i) => HOURS[i] < closeHour).map((c) => c.level));
-    return { win, L, dayShare: L.dayShare, hourShare: L.hourShare, dayLevel };
+    const L = { cells, day, week, dayShare: day.map((v) => v / week) };
+    const dayLevel = (d) => day[d];
+    return { win, L, dayShare: L.dayShare, dayLevel };
   }
 
   // daily counterfactual of one brand for every day with data; weekly sums
@@ -344,12 +340,12 @@ const Model = (() => {
         const f = feat(y, w, d), P = dayDemand(y, brand, w, d);
         const base = { year: y, week: w, d, date: dayKey(y, w, d), own: !!own };
         if (P == null || !f.open) return { ...base, closed: true, cf: 0, effect: 0 };
-        const F = drv.factor(f), cf = v.dayLevel(d, f.closeHour) * F;
+        const F = drv.factor(f), cf = v.dayLevel(d) * F;
         return { ...base, P, Psales: daySales(y, brand, w, d), F, parts: drv.parts(f), cf, effect: P - cf };
       });
       days.push(...ds);
       const actual = sum(ds.map((p) => p.P || 0)), cf = sum(ds.map((p) => p.cf || 0));
-      const lv = sum(ds.filter((p) => !p.closed).map((p) => v.dayLevel(p.d, feat(y, w, p.d).closeHour)));
+      const lv = sum(ds.filter((p) => !p.closed).map((p) => v.dayLevel(p.d)));
       weeks.push({ year: y, week: w, actual, cf, effect: actual - cf, own: !!own, sales: sum(ds.map((p) => p.Psales || 0)),
         level: v.L.week, window: v.win, fr: fr(y, brand, w), factor: cf / lv });
     }
@@ -372,7 +368,7 @@ const Model = (() => {
       for (let d = 0; d < 7; d++) {
         const f = feat(y, w, d);
         if (d === 6 || !f.open) { vals.push(0); continue; }
-        const v = lv.dayLevel(d, f.closeHour) * planFactor(drv, f);
+        const v = lv.dayLevel(d) * planFactor(drv, f);
         vals.push(v);
         const p = drv.parts(f, 0);
         for (const k of DRIVER_NAMES) pw[k] += v * (k === "season" || k === "calendar" ? p[k] : 1);
@@ -434,19 +430,6 @@ const Model = (() => {
     const normalWeeks = wkOos;
     const frNormal = mean(normalWeeks.map((r) => r.fr));
     const extraOnSales25 = sum(m25.weeks.map((w) => m25.wkr(w).sales - m25.wkr(w).cf * frNormal));
-    // the 2025 coupon by hour: actual demand against the counterfactual on full coupon days
-    const hours25 = { base: HOURS.map(() => 0), actual: HOURS.map(() => 0), days: 0 };
-    for (const p of m25.days.filter((q) => C25.full.includes(q.week) && !q.closed)) {
-      const hd_ = hourDemand(2025, "test", p.week, p.d);
-      hours25.days++;
-      HOURS.forEach((h, i) => { hours25.base[i] += p.cf * lv25.L.hourShare[p.d][i]; hours25.actual[i] += hd_[i]; });
-    }
-    hours25.base = hours25.base.map((v) => v / hours25.days);
-    hours25.actual = hours25.actual.map((v) => v / hours25.days);
-    hours25.extra = hours25.actual.map((v, i) => v - hours25.base[i]);
-    hours25.baseShare = hours25.base.map((v) => v / sum(hours25.base));
-    hours25.extraShare = hours25.extra.map((v) => v / sum(hours25.extra));
-
     // the control brand against its own counterfactual: a cross-check of the control assumption
     const checks = {};
     for (const c of OWN) {
@@ -464,7 +447,7 @@ const Model = (() => {
     const lv26 = all.levels(YEAR, PLAN_WEEKS[0]);
     const p26 = planDays(lv26, drv, YEAR, PLAN_WEEKS);
     const B26 = { ...lv26.L, levels: lv26, levelWeek: lv26.L.week, window: lv26.win, weeks: p26.weeks, days: p26.days, parts: p26.parts,
-      week: mean(PLAN_WEEKS.map((w) => p26.weeks[w])), dayShare: lv26.dayShare, hourShare: lv26.hourShare };
+      week: mean(PLAN_WEEKS.map((w) => p26.weeks[w])), dayShare: lv26.dayShare };
     // the same plan one year earlier: what it missed in the coupon weeks (weather, prices, shocks)
     const p25 = planDays(all.levels(C25.year, C25.start), drv, C25.year, m25.weeks);
     const planErr = m25.weeks.map((w) => p25.weeks[w] / m25.wkr(w).cf - 1);
@@ -487,12 +470,12 @@ const Model = (() => {
     const fitRate = lineFit(past.map((p) => ({ x: p.discount, y: p.rateFull })));
     const fitShare = lineFit(past.map((p) => ({ x: p.discount, y: p.extra })));
     const m = past.find((p) => p.year === 2025);
-    // the worked example of the rule: the frozen window of the plan, one weekday and hour
-    const sample = (d, i) => lv26.win.map(([y, w]) => {
-      const f = feat(y, w, d), P = hourDemand(y, "test", w, d);
-      const ok = P != null && f.open && HOURS[i] < f.closeHour;
+    // the worked example of the rule: the frozen window of the plan, one weekday
+    const sample = (d) => lv26.win.map(([y, w]) => {
+      const f = feat(y, w, d), P = dayDemand(y, "test", w, d);
+      const ok = P != null && f.open;
       const F = ok ? drv.factor(f) : null;
-      return { year: y, week: w, date: dayKey(y, w, d), raw: ok ? P[i] : null, factor: F, parts: ok ? drv.parts(f) : null, adj: ok ? P[i] / F : null, status: lv26.L.cells[d][i].status.get(wk(y, w)) };
+      return { year: y, week: w, date: dayKey(y, w, d), raw: ok ? P : null, factor: F, parts: ok ? drv.parts(f) : null, adj: ok ? P / F : null, status: lv26.L.cells[d].status.get(wk(y, w)) };
     });
     // the season curve by week (the Thursday of each week) and the cold / warm scenario
     const seasonCurve = YEAR_WEEKS.map((w) => Math.exp(drv.seasonLog(feat(YEAR, w, 3).frac)));
@@ -503,7 +486,7 @@ const Model = (() => {
     return {
       drivers: drv, driversControl: drvC, trainYears: TRAIN_YEARS, sdIn, sdD, sdL, sdW, oosDays: oos.length, all, allC, ms, m25, m26, lv25,
       extra25: m25.extra, dip25: m25.dip, extraHalf: m25.extraHalf, netHalf: m25.netHalf, frc25: m25.frc, lost25: m25.lost, extraOnSales25,
-      profile, tail, lastChance, dipWeights, frNormal, hours25, past, fitRate, fitShare, measured: m,
+      profile, tail, lastChance, dipWeights, frNormal, past, fitRate, fitShare, measured: m,
       upr: mean(past.map((p) => p.upr)), dipDefault: mean(past.map((p) => p.dip)), shareRelSE: (m.extraHalf / 1.96) / m.extra,
       B26, planWin: lv26, planErr, baseBias25, baseErr25, sample, holdout, controlCheck, seasonCurve, anomalySd,
       cf26: new Map(all.weeks.filter((x) => x.year === YEAR).map((x) => [x.week, x])),
@@ -535,13 +518,6 @@ const Model = (() => {
     const vals = cal.B26.days[w], tot = sum(vals);
     return { share: vals.map((v) => v / tot), closed: vals.map((v) => v === 0) };
   }
-  // hourly shares of a weekday: the baseline of the 6 weeks before that week (the plan baseline after the data), over the open hours
-  const hourShares = (cal, w, d) => {
-    const lv = w <= LAST_DATA ? cal.all.levels(YEAR, w) : cal.B26.levels;
-    const close = feat(YEAR, w, d).closeHour, cells = lv.L.cells[d];
-    const s = sum(cells.filter((c, i) => HOURS[i] < close).map((c) => c.level));
-    return cells.map((c, i) => (HOURS[i] < close && s ? c.level / s : 0));
-  };
   const shareFor = (cal, discount) => cal.fitShare.intercept + cal.fitShare.slope * discount;
 
   function couponPlan(cal, sc) {
@@ -621,14 +597,6 @@ const Model = (() => {
       return { date, day: DAYS[d], closed: false, share: s, baseline, incremental, dip, demand: baseline + incremental - dip, coupon: cDays.includes(d) };
     });
   }
-  function hourly(cal, sc, res, week, d) {
-    const day = daily(cal, sc, res, week)[d];
-    const hs = day.closed ? null : hourShares(cal, week, d);
-    return { day, rows: HOURS.map((h, i) => {
-      const s = day.closed ? 0 : hs[i];
-      return { hour: h, open: !day.closed, share: s, baseline: day.baseline * s, incremental: day.incremental * s, dip: day.dip * s, demand: day.demand * s };
-    }) };
-  }
   // the drivers of one day of the plan year, as the plan sees them (weeks with data: as they were)
   function dayDrivers(cal, week, d, anomaly = 0) {
     const f = feat(YEAR, week, d);
@@ -674,9 +642,9 @@ const Model = (() => {
     return { peak, items, suggestion };
   }
 
-  return { NAME, CONTROL, DAYS, HOURS, PLAN_WEEKS, YEAR_WEEKS, YEAR, LAST_DATA, OWN, C25, C26, TRAIN_YEARS, MAU_2026, DELIVERY_DEFAULT, DEFAULTS, SHELF, WK, HOURLY,
-    CAL, WEATHER, FEATS, DRIVER_NAMES, feat, robustLevel, windowFor, calibrate, reference, shareFor, lengthShare, startWeeks, normalDemand, weatherFactor, dayShares, hourShares, dayDrivers,
-    COUPON_LENGTHS, forecast, daily, hourly, intervals, spanLabel, shelfCheck,
+  return { NAME, CONTROL, DAYS, STORE_CLOSE, PLAN_WEEKS, YEAR_WEEKS, YEAR, LAST_DATA, OWN, C25, C26, TRAIN_YEARS, MAU_2026, DELIVERY_DEFAULT, DEFAULTS, SHELF, WK, DAILY,
+    CAL, WEATHER, FEATS, DRIVER_NAMES, feat, robustLevel, windowFor, calibrate, reference, shareFor, lengthShare, startWeeks, normalDemand, weatherFactor, dayShares, dayDrivers,
+    COUPON_LENGTHS, forecast, daily, intervals, spanLabel, shelfCheck,
     deadline: (start, lead) => new Date(start.getTime() - lead * DAY_MS), isoMonday, dayKey, price, fr, row };
 })();
 if (typeof module !== "undefined") module.exports = Model;

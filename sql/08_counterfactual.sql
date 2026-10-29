@@ -1,7 +1,7 @@
 /* =====================================================================================================
    08  Counterfactual (CausalImpact logic), the coupon measurement, the control cross-check and the plan
    -----------------------------------------------------------------------------------------------------
-   counterfactual of a day = L[weekday, open hours] x drivers_factor of the day
+   counterfactual of a day = L[weekday] x drivers_factor of the day
                            = "the neutral level, on this day's season, calendar, weather and price"
    Incremental units of a coupon = demand - counterfactual, summed over the coupon weeks; the dip after it
    the same way over the dip weeks.
@@ -14,9 +14,9 @@ CREATE TABLE daily_counterfactual AS
 SELECT p.sales_date, p.year, p.week, p.weekday,
        p.demand,
        p.units                     AS sales,
-       l.l_open                    AS neutral_level,
+       l.l_day                     AS neutral_level,
        f.drivers_factor,
-       l.l_open * f.drivers_factor AS counterfactual,
+       l.l_day * f.drivers_factor  AS counterfactual,
        CASE WHEN o.period IS NULL THEN '' ELSE o.period || ' ' || CAST(o.coupon_year AS VARCHAR) END AS period
 FROM daily_demand p
 JOIN test_baseline_day l
@@ -36,7 +36,7 @@ WITH lvl AS (
 )
 SELECT d.year, d.week,
        MAX(d.period)                                 AS period,
-       MAX(lv.baseline)                              AS neutral_baseline,   -- the neutral week (all weekdays, all hours)
+       MAX(lv.baseline)                              AS neutral_baseline,   -- the neutral week (all weekdays)
        SUM(d.counterfactual) / SUM(d.neutral_level)  AS drivers_factor,     -- the week's drivers, demand-weighted
        SUM(d.counterfactual)                         AS counterfactual,
        SUM(d.demand)                                 AS demand,
@@ -65,8 +65,8 @@ DROP TABLE IF EXISTS control_counterfactual;
 CREATE TABLE control_counterfactual AS
 SELECT p.year, p.week,
        SUM(p.demand)                                               AS demand,
-       SUM(l.l_open * f.control_drivers_factor)                    AS counterfactual,
-       SUM(p.demand) - SUM(l.l_open * f.control_drivers_factor)    AS demand_minus_counterfactual
+       SUM(l.l_day * f.control_drivers_factor)                     AS counterfactual,
+       SUM(p.demand) - SUM(l.l_day * f.control_drivers_factor)     AS demand_minus_counterfactual
 FROM daily_demand p
 JOIN control_baseline_day l
   ON l.target_year = p.year AND l.target_week = p.week AND l.weekday = p.weekday
@@ -93,24 +93,18 @@ DROP TABLE IF EXISTS plan_days_counterfactual;
 CREATE TABLE plan_days_counterfactual AS
 WITH anchor AS (
   SELECT year AS target_year, week AS target_week FROM week_positions WHERE has_data = 0
-),
-cells AS (
-  SELECT c.weekday, c.hour, c.baseline_level
-  FROM test_baseline_cells c
-  JOIN anchor a ON a.target_year = c.target_year AND a.target_week = c.target_week
 )
 SELECT f.sales_date, f.year AS plan_year, f.week, f.weekday, f.day_name, f.close_hour,
        f.season_factor, f.calendar_factor, f.plan_factor,
-       SUM(CASE WHEN c.hour < f.close_hour THEN c.baseline_level ELSE 0 END)                 AS neutral_level,
-       SUM(CASE WHEN c.hour < f.close_hour THEN c.baseline_level ELSE 0 END) * f.plan_factor AS counterfactual
+       c.l_day                 AS neutral_level,
+       c.l_day * f.plan_factor AS counterfactual
 FROM day_factors f
 JOIN anchor a
   ON f.year = a.target_year AND f.week >= a.target_week AND f.week <= 52
-JOIN cells c
-  ON c.weekday = f.weekday
+JOIN test_baseline_day c
+  ON c.target_year = a.target_year AND c.target_week = a.target_week AND c.weekday = f.weekday
 WHERE f.open = 1
-  AND f.weekday <= 6
-GROUP BY f.sales_date, f.year, f.week, f.weekday, f.day_name, f.close_hour, f.season_factor, f.calendar_factor, f.plan_factor;
+  AND f.weekday <= 6;
 
 -- the plan weeks: normal demand at normal weather, with the season and calendar factors of the week (demand-weighted)
 DROP TABLE IF EXISTS plan_weeks_counterfactual;

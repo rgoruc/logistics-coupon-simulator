@@ -20,7 +20,7 @@ from model.outputs import all_tables, write_outputs  # noqa: E402
 
 
 def main() -> None:
-    data = load(ROOT / config.DATA_DIR, config.OPENING_HOURS)
+    data = load(ROOT / config.DATA_DIR)
     rule = RuleSettings.from_config(config)
     cal = calibrate(data, rule, config.REFERENCE_COUPON_YEAR, config.THETA_ITERATIONS)
     sc = default_scenario(cal)

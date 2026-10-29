@@ -1,7 +1,7 @@
 """Loading the input CSVs (data/input) and looking up demand.
 
 Demand = sales / fill rate of that week, so weeks with empty shelves do not pull the baseline down.
-Days without a row in hourly_sales.csv are closed (Sundays and public holidays). The holiday calendar, the daily
+Days without a row in daily_sales.csv are closed (Sundays and public holidays). The holiday calendar, the daily
 temperatures (the drivers' inputs) are loaded by drivers.py from the same folder. weekly.csv carries the
 category price index (category_price: the volume-weighted average shelf price of men's deo) next to the brands' prices.
 """
@@ -12,8 +12,6 @@ import datetime as dt
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-
-from .mathutil import total
 
 BRANDS = ("test", "control")  # the coupon brand and the control brand
 NAME, CONTROL = "Deo Test Brand", "Deo Control Brand"
@@ -123,21 +121,18 @@ def _read(path: Path) -> list:
 class Data:
     weekly: dict                      # (year, week) -> row dict
     order: list                       # [(year, week)] weeks with data, in time order
-    hourly: dict                      # "YYYY-MM-DD" -> {"test": [units per hour], "control": [...]}
-    hours: list                       # opening hours, e.g. 8 ... 19
+    daily: dict                       # "YYYY-MM-DD" -> {"test": units sold, "control": units sold}
     own: list                         # [OwnCoupon]
     past: list                        # [PastCoupon]
     shelf: list                       # [ShelfItem]
     assumptions: dict                 # parameter -> value (None when empty)
     folder: Path = Path("data/input")
-    _hd: dict = field(default_factory=dict, repr=False)
     _dd: dict = field(default_factory=dict, repr=False)
 
     # ---------------- loading ----------------
     @classmethod
-    def load(cls, folder, hours=None) -> "Data":
+    def load(cls, folder) -> "Data":
         folder = Path(folder)
-        hours = list(hours or range(8, 20))
         weekly, order = {}, []
         for r in _read(folder / "weekly.csv"):
             row = {k: _num(v) for k, v in r.items()}
@@ -146,18 +141,14 @@ class Data:
             order.append(key)
         order.sort()
 
-        hidx = {h: i for i, h in enumerate(hours)}
-        hourly = {}
-        for r in _read(folder / "hourly_sales.csv"):
-            h = int(_num(r["hour"]))
-            if h not in hidx:
-                raise ValueError(f"hourly_sales.csv: hour {h} is outside the opening hours {hours[0]}-{hours[-1]}")
-            day = hourly.setdefault(r["date"], {b: [None] * len(hours) for b in BRANDS})
-            day[r["brand"].strip().lower()][hidx[h]] = float(_num(r["units"]))
-        for date, day in hourly.items():
+        daily = {}
+        for r in _read(folder / "daily_sales.csv"):
+            day = daily.setdefault(r["date"].strip(), {b: None for b in BRANDS})
+            day[r["brand"].strip().lower()] = float(_num(r["units"]))
+        for date, day in daily.items():
             for b in BRANDS:
-                if any(v is None for v in day[b]):
-                    raise ValueError(f"hourly_sales.csv: {date} has missing hours for {b}")
+                if day[b] is None:
+                    raise ValueError(f"daily_sales.csv: {date} has no row for {b}")
 
         own = []
         for r in _read(folder / "own_coupons.csv"):
@@ -184,7 +175,7 @@ class Data:
                 assumptions["delivery_days"] = v
             else:
                 assumptions[r["parameter"]] = _num(v)
-        return cls(weekly, order, hourly, hours, own, past, shelf, assumptions, folder)
+        return cls(weekly, order, daily, own, past, shelf, assumptions, folder)
 
     # ---------------- lookups ----------------
     def row(self, y: int, w: int) -> dict:
@@ -199,25 +190,17 @@ class Data:
     def price(self, y: int, brand: str, w: int) -> float:
         return self.weekly[(y, w)][f"{brand}_price"]
 
-    def hour_demand(self, y: int, brand: str, w: int, d: int):
-        """Demand per opening hour on weekday d (sales / fill rate), None when the store was closed."""
-        k = (brand, y, w, d)
-        if k not in self._hd:
-            r = self.hourly.get(day_key(y, w, d))
-            f = self.fill_rate(y, brand, w)
-            self._hd[k] = [v / f for v in r[brand]] if r else None
-        return self._hd[k]
-
     def day_demand(self, y: int, brand: str, w: int, d: int):
+        """Demand on weekday d (sales / fill rate of the week), None when the store was closed."""
         k = (brand, y, w, d)
         if k not in self._dd:
-            h = self.hour_demand(y, brand, w, d)
-            self._dd[k] = total(h) if h else None
+            r = self.daily.get(day_key(y, w, d))
+            self._dd[k] = r[brand] / self.fill_rate(y, brand, w) if r else None
         return self._dd[k]
 
     def day_sales(self, y: int, brand: str, w: int, d: int):
-        r = self.hourly.get(day_key(y, w, d))
-        return total(r[brand]) if r else None
+        r = self.daily.get(day_key(y, w, d))
+        return r[brand] if r else None
 
     # ---------------- calendar of the plan ----------------
     def plan_year(self) -> int:

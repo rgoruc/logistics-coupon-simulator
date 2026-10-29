@@ -8,7 +8,7 @@
 
    Two ways to get the files into the stage:
    A) SnowSQL (command line), from the project folder:
-        PUT file://data/input/hourly_sales.csv  @coupon_stage AUTO_COMPRESS = TRUE;
+        PUT file://data/input/daily_sales.csv   @coupon_stage AUTO_COMPRESS = TRUE;
         PUT file://data/input/weekly.csv        @coupon_stage AUTO_COMPRESS = TRUE;
         PUT file://data/input/own_coupons.csv   @coupon_stage AUTO_COMPRESS = TRUE;
         PUT file://data/output/day_factors.csv  @coupon_stage AUTO_COMPRESS = TRUE;
@@ -30,13 +30,12 @@ CREATE OR REPLACE FILE FORMAT csv_format
 
 CREATE OR REPLACE STAGE coupon_stage FILE_FORMAT = csv_format;
 
--- hourly store sales, one row per day, hour and brand (closed days have no rows)
-CREATE OR REPLACE TABLE hourly_sales (
+-- daily store sales, one row per day and brand (closed days have no rows)
+CREATE OR REPLACE TABLE daily_sales (
   sales_date DATE,
   year       INT,      -- ISO year of the calendar week
   week       INT,      -- ISO calendar week
   weekday    INT,      -- 1 = Monday ... 6 = Saturday
-  hour       INT,      -- 8 = 08:00-09:00 ... 19 = 19:00-20:00
   brand      VARCHAR,  -- 'test' (coupon brand) or 'control' (control brand)
   units      NUMBER(38, 0)
 );
@@ -68,7 +67,8 @@ CREATE OR REPLACE TABLE own_coupons (
 
 -- the drivers of every day, from the first data day to the end of the plan year (data/output/day_factors.csv).
 -- Fitted in Python on the years before the plan year: season, calendar (days before a holiday, the run-up to
--- Christmas), weather (temperature anomaly) and price (the brand's price against the category price index).
+-- Christmas, the short day 24 December), weather (temperature anomaly) and price (the brand's price against the
+-- category price index).
 -- A factor of 1.10 = that driver lifts the day's demand by 10 %.
 CREATE OR REPLACE TABLE day_factors (
   sales_date             DATE,
@@ -89,15 +89,16 @@ CREATE OR REPLACE TABLE day_factors (
   relative_price_test    FLOAT,    -- log(Deo Test Brand price / category price index) against its usual level
   pre_holiday_1          INT,      -- 1 = the last open day before a closed holiday
   pre_holiday_2          INT,      -- 1 = the open day before that
-  christmas_ramp         FLOAT     -- 0 outside December, rising to 1 on 23 December
+  christmas_ramp         FLOAT,    -- 0 outside December, rising to 1 on 23 December
+  short_day              INT       -- 1 = the store closes early (24 December, 14:00)
 );
 
-COPY INTO hourly_sales FROM @coupon_stage PATTERN = '.*hourly_sales[.]csv.*';
+COPY INTO daily_sales  FROM @coupon_stage PATTERN = '.*daily_sales[.]csv.*';
 COPY INTO weekly       FROM @coupon_stage PATTERN = '.*weekly[.]csv.*';
 COPY INTO own_coupons  FROM @coupon_stage PATTERN = '.*own_coupons[.]csv.*';
 COPY INTO day_factors  FROM @coupon_stage PATTERN = '.*day_factors[.]csv.*';
 
-SELECT 'hourly_sales' AS table_name, COUNT(*) AS row_count FROM hourly_sales
+SELECT 'daily_sales' AS table_name, COUNT(*) AS row_count FROM daily_sales
 UNION ALL SELECT 'weekly', COUNT(*) FROM weekly
 UNION ALL SELECT 'own_coupons', COUNT(*) FROM own_coupons
 UNION ALL SELECT 'day_factors', COUNT(*) FROM day_factors;

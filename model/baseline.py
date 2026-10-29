@@ -1,6 +1,6 @@
-"""The baseline rule (your SQL logic from the minute-level TV baseline), here per weekday and hour.
+"""The baseline rule, per weekday.
 
-For one weekday and opening hour, take that weekday and hour in each of the last 6 weeks (n values):
+For one weekday, take that weekday in each of the last 6 weeks (n values):
   1. Rank the values from high to low.
   2. Outlier threshold = value at rank floor(n/2)+1
                          + 2 x standard deviation of the middle ranks (round(n/6) ranks left out at each end)
@@ -71,23 +71,14 @@ def robust_level(items, rule: RuleSettings = RuleSettings()) -> RuleResult:
 
 @dataclass
 class Baseline:
-    cells: list   # [weekday 0-5][hour index] -> RuleResult
-    day: list     # baseline per weekday (sum of the hours)
+    cells: list   # [weekday 0-5] -> RuleResult
+    day: list     # baseline per weekday
     week: float   # sum of the weekdays
 
 
 def baseline_of(data, brand: str, window, rule: RuleSettings = RuleSettings()) -> Baseline:
-    """The rule on one brand's hourly demand over a window of (year, week) pairs."""
+    """The rule on one brand's daily demand over a window of (year, week) pairs."""
     from .data import week_key
-    cells = []
-    for d in range(6):
-        row = []
-        for i in range(len(data.hours)):
-            items = []
-            for (y, w) in window:
-                hd = data.hour_demand(y, brand, w, d)
-                items.append((week_key(y, w), hd[i] if hd else None))
-            row.append(robust_level(items, rule))
-        cells.append(row)
-    day = [total(c.level for c in r) for r in cells]
+    cells = [robust_level([(week_key(y, w), data.day_demand(y, brand, w, d)) for (y, w) in window], rule) for d in range(6)]
+    day = [c.level for c in cells]
     return Baseline(cells, day, total(day))

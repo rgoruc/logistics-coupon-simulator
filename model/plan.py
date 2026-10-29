@@ -109,17 +109,6 @@ def day_shares(cal: Calibration, week: int) -> tuple:
     return [v / tot for v in vals], [v == 0 for v in vals]
 
 
-def hour_shares(cal: Calibration, week: int, d: int) -> list:
-    """Hourly shares of a weekday: the baseline of the 6 weeks before that week (the plan baseline after the data),
-    over the hours the store is open that day (fewer on a short day)."""
-    data = cal.data
-    lv = cal.all.levels(data.plan_year(), week) if week <= data.last_data_week() else cal.plan.levels
-    close = cal.feats[day_date(data.plan_year(), week, d)].close_hour
-    cells = lv.L.cells[d]
-    s = total(c.level for c, h in zip(cells, data.hours) if h < close)
-    return [c.level / s if h < close and s else 0.0 for c, h in zip(cells, data.hours)]
-
-
 def default_scenario(cal: Calibration) -> Scenario:
     """Scenario from data/input/plan_assumptions.csv. Empty values get the defaults of the HTML page,
     rounded the same way (reference rate to 0.1 point, shares to 1 point, units per redemption to 0.1)."""
@@ -274,17 +263,6 @@ def daily(cal: Calibration, sc: Scenario, res: Forecast, week: int) -> list:
         out.append({"date": date, "day": DAYS[d], "closed": False, "share": s, "baseline": baseline, "incremental": incremental,
                     "dip": dip, "demand": baseline + incremental - dip, "coupon": d in c_days})
     return out
-
-
-def hourly(cal: Calibration, sc: Scenario, res: Forecast, week: int, d: int) -> dict:
-    day = daily(cal, sc, res, week)[d]
-    hs = None if day["closed"] else hour_shares(cal, week, d)
-    rows = []
-    for i, h in enumerate(cal.data.hours):
-        s = 0.0 if day["closed"] else hs[i]
-        rows.append({"hour": h, "open": not day["closed"], "share": s, "baseline": day["baseline"] * s,
-                     "incremental": day["incremental"] * s, "dip": day["dip"] * s, "demand": day["demand"] * s})
-    return {"day": day, "rows": rows}
 
 
 def day_drivers(cal: Calibration, week: int, d: int, anomaly: float = 0.0):

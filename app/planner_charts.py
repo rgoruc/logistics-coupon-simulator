@@ -10,7 +10,6 @@ import matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
-from matplotlib.patches import Rectangle  # noqa: E402
 from matplotlib.ticker import FuncFormatter  # noqa: E402
 
 BLUE, PINK, GREY, RED, INK, INK2, GRID = "#2a78d6", "#e87ba4", "#898781", "#e34948", "#0b0b0b", "#52514e", "#e1e0d9"
@@ -145,50 +144,6 @@ def bridge_chart(summary: dict):
     ax.xaxis.set_major_formatter(FuncFormatter(_k))
     ax.spines["left"].set_visible(False)
     ax.grid(axis="y", visible=False)
-    fig.tight_layout()
-    return fig
-
-
-def baseline_heatmap(cells: list, hours: list, selected: tuple):
-    """cells[weekday][hour] -> baseline level. selected = (weekday index, hour index)."""
-    import numpy as np
-    vals = np.array([[c for c in row] for row in cells], dtype=float)
-    fig, ax = plt.subplots(figsize=(11, 3.4))
-    im = ax.imshow(vals, cmap="Blues", aspect="auto", vmin=vals.min() - (vals.max() - vals.min()) * 0.15, vmax=vals.max())
-    for d in range(vals.shape[0]):
-        for i in range(vals.shape[1]):
-            v = vals[d, i]
-            ax.text(i, d, f"{v:,.0f}", ha="center", va="center", fontsize=8.5,
-                    color="white" if v > vals.min() + (vals.max() - vals.min()) * 0.6 else INK)
-    d0, i0 = selected
-    ax.add_patch(Rectangle((i0 - 0.5, d0 - 0.5), 1, 1, fill=False, edgecolor=INK, lw=2))
-    ax.set_xticks(range(len(hours)))
-    ax.set_xticklabels([f"{h:02d}" for h in hours])
-    ax.set_yticks(range(vals.shape[0]))
-    ax.set_yticklabels(DAYS[:vals.shape[0]])
-    ax.set_xlabel("Hour (start)")
-    ax.grid(False)
-    for s in ax.spines.values():
-        s.set_visible(False)
-    cb = fig.colorbar(im, ax=ax, fraction=0.025, pad=0.01)
-    cb.outline.set_visible(False)
-    cb.set_label("units per hour", color=INK2)
-    fig.tight_layout()
-    return fig
-
-
-def hours_chart(hours: list, base: list, actual: list):
-    fig, ax = plt.subplots(figsize=(11, 3.2))
-    ax.plot(hours, base, color=GREY, lw=2, ls=(0, (4, 3)), label="Counterfactual")
-    ax.plot(hours, actual, color=BLUE, lw=2, label="Actual demand")
-    ax.fill_between(hours, base, actual, color=PINK, alpha=0.35, lw=0, label="Incremental demand")
-    ax.set_xticks(hours)
-    ax.set_xticklabels([f"{h:02d}" for h in hours])
-    ax.set_xlabel("Hour (start), average full coupon day")
-    ax.set_ylim(bottom=0)
-    ax.yaxis.set_major_formatter(FuncFormatter(_k))
-    ax.grid(axis="x", visible=False)
-    ax.legend(loc="lower left", bbox_to_anchor=(0, 1.0), ncol=3, fontsize=9)
     fig.tight_layout()
     return fig
 

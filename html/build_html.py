@@ -2,8 +2,8 @@
 
     python html/build_html.py
 
-What it takes from the CSVs: the hourly and weekly sales, the daily temperatures, the holiday calendar, the Google
-Trends series, the past coupons, the shelf data and the plan defaults (discount, start week, app users, lead time ...).
+What it takes from the CSVs: the daily and weekly sales, the daily temperatures, the holiday calendar, the past
+coupons, the shelf data and the plan defaults (discount, start week, app users, lead time ...).
 The page then recalculates everything in the browser, including the drivers regression.
 
 What it does not take: changes to the Python model or to config.py. The page has its own copy of the logic in
@@ -42,9 +42,7 @@ def num(v) -> str:
 
 
 def build(folder: Path) -> str:
-    data = Data.load(folder, config.OPENING_HOURS)
-    if data.hours != list(range(8, 20)):
-        fail("the page expects opening hours 08:00-20:00.")
+    data = Data.load(folder)
     if data.plan_year() != FIXED["plan_year"] or data.last_data_week() != FIXED["last_data_week"]:
         fail(f"the page is written for data up to week 42 of 2026; the data end in week {data.last_data_week()} of {data.plan_year()}.")
     own = [(c.year, c.start, c.full, c.partial_week, c.post) for c in data.own]
@@ -56,10 +54,7 @@ def build(folder: Path) -> str:
         r = data.weekly[(y, w)]
         weekly.append(";".join(num(r[k]) for k in ["year", "week", "test_units", "test_fill_rate", "test_price", "control_units",
                                                      "control_fill_rate", "control_price", "category_price", "test_dc_orders"]))
-    hourly = ["date;" + ";".join(f"{b}_{h:02d}" for b in ("test", "control") for h in data.hours)]
-    for date in sorted(data.hourly):
-        r = data.hourly[date]
-        hourly.append(date + ";" + ";".join(num(v) for b in ("test", "control") for v in r[b]))
+    daily = ["date;test;control"] + [f"{date};{num(data.daily[date]['test'])};{num(data.daily[date]['control'])}" for date in sorted(data.daily)]
     temperature = ["date;tmax"] + [f"{r['date']};{num(_num(r['tmax_c']))}" for r in _read(folder / "temperature.csv")]
     holidays = ["date;name;kind;close_hour"] + [f"{r['date']};{r['name']};{r['kind']};{r.get('close_hour', '')}" for r in _read(folder / "holidays.csv")]
     if sorted({y for (y, w) in data.order if y < data.plan_year()}) != [2024, 2025]:
@@ -99,7 +94,7 @@ def build(folder: Path) -> str:
     src = (HERE / "src" / "model.src.js").read_text(encoding="utf-8")
     for key, val in {"__MAU__": str(int(a.get("app_users") or 0)),
                      "__DELIVERY__": json.dumps(delivery), "__DEFAULTS__": json.dumps(defaults), "__SHELF__": json.dumps(shelf, ensure_ascii=False),
-                     "__PAST__": json.dumps(past, ensure_ascii=False), "__WEEKLY__": "\n".join(weekly), "__HOURLY__": "\n".join(hourly),
+                     "__PAST__": json.dumps(past, ensure_ascii=False), "__WEEKLY__": "\n".join(weekly), "__DAILY__": "\n".join(daily),
                      "__TEMPERATURE__": "\n".join(temperature), "__HOLIDAYS__": "\n".join(holidays)}.items():
         assert key in src, key
         src = src.replace(key, val)

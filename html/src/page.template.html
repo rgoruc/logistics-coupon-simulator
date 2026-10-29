@@ -177,14 +177,6 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .day .closed { min-height: 40px; display: grid; place-items: center; font-size: 0.72rem; color: var(--muted); border: 1px dashed var(--axis); border-radius: 7px; width: 100%; }
 .day b { min-height: 40px; display: grid; place-items: center; width: 100%; font: 600 0.88rem var(--font-ui); font-variant-numeric: tabular-nums; color: var(--ink); }
 h3.mini { font-size: 0.9rem; font-weight: 600; margin-top: 16px; }
-.heat { display: grid; grid-template-columns: 30px repeat(12, minmax(0, 1fr)); gap: 2px; margin-top: 10px; }
-.heat .h-lab { font-size: 0.66rem; color: var(--muted); text-align: center; font-variant-numeric: tabular-nums; }
-.heat .h-row { font-size: 0.72rem; color: var(--ink-2); display: flex; align-items: center; }
-.heat button { min-height: 24px; border: 0; border-radius: 3px; padding: 0; cursor: pointer; }
-.heat button[aria-pressed="true"] { outline: 2px solid var(--ink); outline-offset: 1px; }
-.heat-scale { display: flex; align-items: center; gap: 8px; font-size: 0.72rem; color: var(--muted); margin-top: 10px; font-variant-numeric: tabular-nums; }
-.heat-scale i { flex: 0 0 120px; height: 8px; border-radius: 4px; }
-.heat-pick { margin-top: 8px; font-size: 0.82rem; color: var(--ink-2); min-height: 1.3em; }
 .day button { width: 100%; min-height: 40px; border-radius: 7px; border: 1px solid var(--border); background: var(--plane); color: var(--ink-2); font: 500 0.82rem var(--font-ui); cursor: pointer; }
 .day button[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
 
@@ -553,24 +545,15 @@ tr.is-closed td { color: var(--muted); }
     <div class="card">
       <div class="card-title"><h2>Baseline: the rule, last 6 weeks</h2><span class="small" id="base-sub"></span></div>
       <div class="note" id="base-intro"></div>
-      <h3 class="mini" id="base-ex-title"></h3>
+      <h3 class="mini">Baseline units per weekday</h3>
+      <div class="table-wrap"><table id="base-table" class="compact"></table></div>
+      <div class="small" id="base-note"></div>
+      <div class="field sub-head">
+        <span class="field-label" id="base-ex-title"></span>
+        <div class="seg" role="radiogroup" aria-label="Weekday of the example" id="base-day"></div>
+      </div>
       <div class="table-wrap"><table id="base-ex-table" class="compact"></table></div>
       <div class="small" id="base-ex-note"></div>
-      <h3 class="mini">Baseline units per hour</h3>
-      <div class="heat" id="heat" role="group" aria-label="Baseline units per hour by weekday and hour"></div>
-      <div class="heat-scale" id="heat-scale"></div>
-      <p class="heat-pick" id="heat-pick" aria-live="polite"></p>
-      <div class="small" id="base-note"></div>
-      <details class="data"><summary>Baseline data, units per hour</summary><div class="table-wrap"><table id="heat-table" class="compact"></table></div></details>
-    </div>
-    <div class="card">
-      <div class="card-title"><h2>2025 coupon by hour</h2><span class="small">Average full coupon day</span></div>
-      <div class="legend">
-        <span><i class="key base"></i>Counterfactual</span>
-        <span><i class="key"></i>Actual demand</span>
-      </div>
-      <div class="chart" id="hours-chart" tabindex="0" role="img" aria-label="Deo Test Brand demand by hour on an average coupon day in 2025 against the counterfactual"></div>
-      <div class="small" id="hours-note"></div>
     </div>
     <div class="card">
       <h2>Past Deo Test Brand coupons</h2>
@@ -616,12 +599,6 @@ tr.is-closed td { color: var(--muted); }
       <div class="field sub-head"><span class="field-label" id="daily-drivers-label">The drivers of each day</span></div>
       <div class="table-wrap"><table id="daily-drivers-table" class="compact"></table></div>
       <div class="small" id="daily-drivers-note"></div>
-      <div class="field sub-head">
-        <span class="field-label" id="hour-label">Hourly plan, 08:00 to 20:00</span>
-        <div class="seg" role="radiogroup" aria-label="Day of the hourly plan" id="hour-day"></div>
-      </div>
-      <div class="table-wrap"><table id="hour-table" class="compact"></table></div>
-      <div class="small" id="hour-note"></div>
     </div>
     <div class="card">
       <div class="card-title"><h2>Shelf check, high-volume store</h2><span class="small" id="shelf-sub"></span></div>
@@ -1110,7 +1087,7 @@ tr.is-closed td { color: var(--muted); }
     rate: DEF.rate == null ? { mode: "ref", value: null, text: "" } : { mode: "custom", value: DEF.rate, text: (DEF.rate * 100).toFixed(1) },
     upr: DEF.upr ?? Math.round(cal.upr * 10) / 10, inc: DEF.inc ?? shareAt(DEF.discount), incAuto: DEF.inc == null,
     pull: DEF.pull ?? Math.round(cal.dipDefault * 100), unc: DEF.unc,
-    fill: DEF.fill ?? Math.round(cal.frNormal * 100), delivery: [...M.DELIVERY_DEFAULT], lead: DEF.lead, depth: DEF.depth, dailyWeek: null, hourDay: 5, heatCell: [4, 9],
+    fill: DEF.fill ?? Math.round(cal.frNormal * 100), delivery: [...M.DELIVERY_DEFAULT], lead: DEF.lead, depth: DEF.depth, dailyWeek: null, baseDay: 4,
     weather: "normal", // the plan weeks: cold / normal / warm (one standard deviation of the weekly temperature anomaly)
   };
   const WEATHER = { cold: -cal.anomalySd, normal: 0, warm: cal.anomalySd };
@@ -1134,7 +1111,7 @@ tr.is-closed td { color: var(--muted); }
   });
   const startSel = $("start-week");
   startSel.addEventListener("change", (e) => { state.startWeek = Number(e.target.value); state.dailyWeek = null; update(); });
-  buildSeg("hour-day", "hday", DAYS.slice(0, 6).map((d, i) => ({ value: i, label: d })), state.hourDay, (v) => { state.hourDay = v; renderHourly(); });
+  buildSeg("base-day", "bday", DAYS.slice(0, 6).map((d, i) => ({ value: i, label: d })), state.baseDay, (v) => { state.baseDay = v; renderBaseline(); });
   buildSeg("weather-group", "weather", [["cold", `Cold (${nf1.format(-cal.anomalySd)} °C)`], ["normal", "Normal"], ["warm", `Warm (+${nf1.format(cal.anomalySd)} °C)`]].map(([value, label]) => ({ value, label })), state.weather, (v) => { state.weather = v; update(); });
 
   const priceInput = $("price");
@@ -1190,7 +1167,7 @@ tr.is-closed td { color: var(--muted); }
       ["Context", [
         "A drugstore publishes app coupons for a men's deo brand (test brand). Customers activate them in the app and redeem them at the store.",
         "Region: Baden-Württemberg, 1 distribution centre and 450 stores, open 08:00 to 20:00, Monday to Saturday. Closed on Sundays and public holidays.",
-        `Data: fictional hourly store sales from week ${first[1]} of ${first[0]} to week ${lastW[1]} of ${lastW[0]} mimicking the seasonality shown in Google Trends Search for keyword "deo" in Germany (Data source: Google Trends, google.com/trends).`,
+        `Data: fictional daily store sales from week ${first[1]} of ${first[0]} to week ${lastW[1]} of ${lastW[0]} mimicking the seasonality shown in Google Trends Search for keyword "deo" in Germany (Data source: Google Trends, google.com/trends).`,
         `Driver inputs: daily maximum temperature for Karlsruhe (Open-Meteo archive, to ${fmtDate(new Date(M.WEATHER.lastDay + "T00:00:00Z"))}); Baden-Württemberg public holidays; the weekly category price index.`,
       ]],
       ["Prices", [
@@ -1207,11 +1184,11 @@ tr.is-closed td { color: var(--muted); }
         state.inc === incRef ? `Incremental share: ${state.inc}% at ${state.discount}% off (line through the past coupons by discount).` :
           `Incremental share: ${state.inc}% (your setting; line through the past coupons: ${incRef}% at ${state.discount}% off).`,
         `Dip after the coupon: ${state.pull}% of the incremental units ` + (state.pull === pullD ? "(average of the past coupons)" : `(your setting; past coupons: ${pullD}%)`) + ", spread over the 3 weeks after it as in 2025.",
-        "Weekly split: the shape of the 2025 coupon, launch week strongest. Hourly split: the normal hourly pattern.",
+        "Weekly split: the shape of the 2025 coupon, launch week strongest.",
       ]],
       ["Normal demand (without the coupon)", [
-        "Baseline rule, fixed: same weekday and hour in the last 6 weeks. A value is an outlier above the middle value + 2 × standard deviation + 2. The baseline is the average of the 3 values around the median.",
-        `Normal demand of a day = baseline × season × calendar (shopping days before a holiday, the run-up to Christmas) × weather × price (against the category price index). The effects are measured on ${cal.trainYears.join(" and ")} and tested on ${M.YEAR} (Drivers card in the Forecast tab).`,
+        "Baseline rule, fixed: same weekday in the last 6 weeks, on daily demand. A value is an outlier above the middle value + 2 × standard deviation + 2. The baseline is the average of the 3 values around the median.",
+        `Normal demand of a day = baseline × season × calendar (shopping days before a holiday, the run-up to Christmas, 24 December closing at 14:00) × weather × price (against the category price index). The effects are measured on ${cal.trainYears.join(" and ")} and tested on ${M.YEAR} (Drivers card in the Forecast tab).`,
         `Weeks 1 to ${M.LAST_DATA}: the drivers as they were (the counterfactual). Weeks ${M.LAST_DATA + 1} to 52: baseline of weeks ${win[0][1]} to ${win[win.length - 1][1]} of ${win[0][0]} × the season × ${M.YEAR}'s holiday calendar × the weather scenario (${state.weather}); prices at their usual level.`,
         "Demand = sales ÷ fill rate.",
       ]],
@@ -1500,7 +1477,6 @@ tr.is-closed td { color: var(--muted); }
     else note("daily-note", `Each weekday's share comes from the baseline rule and the drivers of that day (2026's holidays, the season, ${state.weather} weather).`,
       `The baseline rule gives the weekday pattern of the last 6 weeks; the drivers add 2026's holiday calendar (closed days, the shopping days before a holiday, the short day before Christmas), the season and the ${state.weather} weather scenario.`);
     renderDailyDrivers();
-    renderHourly();
   }
 
   // the drivers of each day of the selected week: the factors the normal demand of the day is built from
@@ -1513,34 +1489,14 @@ tr.is-closed td { color: var(--muted); }
     table("daily-drivers-table", head, rows.map(({ d, f, p }) => {
       const date = fmtDate(new Date(f.date.getTime()), false);
       if (!p) return [`${DAYS[d]} ${date}`, { text: "Closed", cls: "dim" }, blank, blank, blank, blank];
-      const label = `${DAYS[d]} ${date}` + (f.closeHour < M.HOURS[M.HOURS.length - 1] + 1 ? ` · until ${hh(f.closeHour)}:00` : "");
+      const label = `${DAYS[d]} ${date}` + (f.closeHour < M.STORE_CLOSE ? ` · until ${hh(f.closeHour)}:00` : "");
       return [label, fx(p.season), fx(p.calendar), fx(p.weather), fx(p.price), { text: nf2.format(p.total), cls: "" }];
     }), (i) => (rows[i].p ? null : "is-closed"));
     const cal_ = rows.filter((r) => r.p && Math.abs(r.p.calendar - 1) > 0.0005);
     note("daily-drivers-note", `Normal demand of a day = the neutral baseline for that weekday × the factors in its row. ` +
-      (cal_.length ? `Calendar above 1.00: ${cal_.map((r) => `${DAYS[r.d]} ${nf2.format(r.p.calendar)}`).join(", ")} (a shopping day before a public holiday, or the run-up to Christmas).` : "No public holiday nearby this week."),
+      (cal_.length ? `Calendar not 1.00: ${cal_.map((r) => `${DAYS[r.d]} ${nf2.format(r.p.calendar)}`).join(", ")} (a shopping day before a public holiday, the run-up to Christmas, or 24 December, when the store closes at 14:00).` : "No public holiday nearby this week."),
       inData ? `Weather is the day's maximum temperature against its seasonal normal; price is ${B}'s price against the category price index that week (below 1.00 when other brands were on promotion).` :
         `Prices are not known in advance, so the plan keeps them at their usual level (1.00); weather follows the scenario you pick under Assumptions.`);
-  }
-
-  function renderHourly() {
-    if (!last) return;
-    const { res, ready, sc } = last;
-    if (!res.rows.some((x) => x.week === state.dailyWeek)) return;
-    const { day, rows } = M.hourly(cal, sc, res, state.dailyWeek, state.hourDay);
-    const date = fmtDate(new Date(day.date + "T00:00:00Z"), false);
-    $("hour-label").textContent = `Hourly plan, ${day.day} ${date}, 08:00 to 20:00`;
-    const maxV = Math.max(...rows.map((r) => (ready ? r.demand : r.baseline)), 1);
-    const bar = (v) => { const c = el("div", "bar-cell"); const i = el("i"); i.style.width = Math.round((v / maxV) * 50) + "px"; c.append(el("span", null, nf.format(Math.round(v))), i); return c; };
-    const peak = rows.reduce((a, b) => ((ready ? b.demand : b.baseline) > (ready ? a.demand : a.baseline) ? b : a));
-    const head = ready ? ["Hour", "Baseline", "Incremental", "Demand"] : ["Hour", "Baseline"];
-    table("hour-table", head, rows.map((r) => {
-      const lab = `${hh(r.hour)}–${hh(r.hour + 1)}`;
-      const inc = r.incremental - r.dip;
-      return ready ? [lab, nf.format(Math.round(r.baseline)), Math.round(inc) ? delta(inc) : blank, bar(r.demand)] : [lab, bar(r.baseline)];
-    }), (i) => (rows[i] === peak ? "is-coupon" : null));
-    note("hour-note", `The busiest hour is ${hh(peak.hour)}:00 to ${hh(peak.hour + 1)}:00 with ${pct1(peak.share)} of the day.`,
-      `Units for the region. Each hour's share of the day is the ${B} baseline for ${FULL_DAY[state.hourDay]}: the same weekday and hour in the 6 weeks before.` + (ready ? " Incremental units use the same hourly shares; in 2025 the coupon followed the normal hourly pattern (Last coupon)." : ""));
   }
 
   /* ---------- forecast chart: baseline + incremental - dip ---------- */
@@ -1620,6 +1576,7 @@ tr.is-closed td { color: var(--muted); }
       ["Day before a holiday", "the first shopping day before a public holiday", eff("pre1"), pm("pre1"), "24 December (before 25 and 26 December: two holidays, so twice)"],
       ["Two days before a holiday", "the second shopping day before a public holiday", eff("pre2"), pm("pre2"), "23 December"],
       ["Run-up to Christmas", "1 to 24 December, rising to the full effect on 23 December", eff("xmas"), pm("xmas"), "as measured"],
+      ["Short day", "24 December, the store closes at 14:00", eff("short"), pm("short"), "24 December"],
       ["Weather", "per 1 °C the daily maximum is above the seasonal normal", eff("anomaly"), pm("anomaly"), `normal, cold or warm (±${nf1.format(cal.anomalySd)} °C: ${eff("anomaly", -cal.anomalySd)} / ${eff("anomaly", cal.anomalySd)})`],
       ["Price", "the category price index 5% lower (other brands on promotion), Deo Test Brand's price unchanged", eff("z", -Math.log(0.95)), pm("z", -Math.log(0.95)), "normal prices (1.00)"],
     ];
@@ -1627,7 +1584,7 @@ tr.is-closed td { color: var(--muted); }
   function renderDrivers() {
     const h = cal.holdout;
     $("drivers-sub").textContent = `${B} · measured on ${cal.trainYears.join(" and ")}, tested on ${M.YEAR}`;
-    note("drivers-intro", "Normal demand of a day = the baseline for that weekday and hour × season × calendar × weather × price.",
+    note("drivers-intro", "Normal demand of a day = the baseline for that weekday × season × calendar × weather × price.",
       `The effects are measured together, in one regression on the log of daily demand (${nf.format(cal.drivers.fit.n)} days of ${cal.trainYears.join(" and ")}, outside ${B}'s own coupons), so a hot week in July is not mistaken for the season. Weather is the daily maximum against its seasonal normal, so it cannot absorb the season. Price is ${B}'s shelf price against the category price index (the volume-weighted average shelf price of men's deo), so every brand's promotion enters, not just one competitor's. ` +
       `The weekday and the level are not drivers: the baseline rule carries them, 6 weeks at a time.`);
     table("drivers-table", ["Driver", "Effect on normal demand", "In the plan weeks"], DRIVER_ROWS().map(([name, desc, effect, pm, plan]) => {
@@ -1660,12 +1617,6 @@ tr.is-closed td { color: var(--muted); }
       `${M.CONTROL} gets the same model: its own baseline and its own drivers (its price against the category price index). If the coupon pulled the control's buyers, the control would fall below its own normal demand in the coupon weeks. ` +
       `Competitors' promotions, the control's included, enter ${B} through the category price index: when the index is 5% lower, ${B} sells ${pctSigned(Math.exp(-cal.drivers.coef("z") * Math.log(0.95)) - 1)}.`);
     renderBaseline();
-    {
-      const H = cal.hours25, dev = Math.max(...H.extraShare.map((v, i) => Math.abs(v - H.baseShare[i])));
-      const pk = H.extra.indexOf(Math.max(...H.extra));
-      note("hours-note", `Weeks 43 to 46 of 2025, ${H.days} full coupon days: the gap between the lines is the coupon's extra demand by hour, largest at ${hh(M.HOURS[pk])}:00 (${nf.format(Math.round(H.extra[pk]))} units).`,
-        `Measured like a TV spot against its baseline. Each hour's share of the incremental demand is within ${nf1.format(dev * 100)} points of its share of the counterfactual, so the plan spreads incremental units with the normal hourly shares. In this fictional data that is built in; real redemption data would show whether app users shop at other hours.`);
-    }
     const metrics = [
       ["Discount", (p) => pct0(p.discount)],
       ["App users", (p) => kfmt(p.mau)],
@@ -1683,16 +1634,20 @@ tr.is-closed td { color: var(--muted); }
       (i) => (["Rate at full availability", "Incremental share"].includes(metrics[i][0]) ? "is-coupon" : null));
   }
 
-  /* ---------- baseline rule: worked example and weekday x hour map (2026, the plan baseline) ---------- */
+  /* ---------- baseline rule: the baseline per weekday and a worked example (2026, the plan baseline) ---------- */
   function renderBaseline() {
     const R = cal.planWin.L.cells;
-    const slot = (d, i) => `${DAYS[d]} ${hh(M.HOURS[i])}:00–${hh(M.HOURS[i] + 1)}:00`;
     $("base-sub").textContent = `${B}, 2026`;
-    note("base-intro", "The rule from the minute-level TV baseline, per hour: the same weekday and hour in the last 6 weeks as neutral demand (the hour's demand ÷ the drivers of its day). Shown: the frozen baseline for the plan, weeks 37 to 42.",
-      "Dividing by the drivers means a hot day or a day before a holiday does not count more than it should. Ranked high to low, a value is an outlier when it is above the middle value + 2 × the standard deviation of the middle ranks + 2. The baseline is the average of the 3 values around the median of the values that are left. Closed days and closed hours are left out.");
-    const [d0, i0] = state.heatCell;
-    const smp = cal.sample(d0, i0), c = R[d0][i0];
-    $("base-ex-title").textContent = `Example: ${slot(d0, i0)}`;
+    note("base-intro", "The rule on daily demand: the same weekday in the last 6 weeks as neutral demand (the day's demand ÷ the drivers of that day). Shown: the frozen baseline for the plan, weeks 37 to 42.",
+      "Dividing by the drivers means a hot day or a day before a holiday does not count more than it should. Ranked high to low, a value is an outlier when it is above the middle value + 2 × the standard deviation of the middle ranks + 2. The baseline is the average of the 3 values around the median of the values that are left. Closed days are left out.");
+    table("base-table", ["Weekday", "Baseline units"], R.map((x, d) => [FULL_DAY[d], nf.format(Math.round(x.level))]), (d) => (d === state.baseDay ? "is-coupon" : null));
+    let nOut = 0, n = 0;
+    R.forEach((x) => { n += x.n; nOut += x.nOut; });
+    note("base-note", `The neutral week is ${plain100(cal.B26.levelWeek)} units, the sum of these 6 values; a plan week is each day's value × its drivers (${plain100(cal.B26.weeks[43])} in week 43, ${plain100(cal.B26.weeks[50])} in week 50). The rule set aside ${nOut} of ${n} values.`,
+      `With only 6 values the middle ranks understate the spread, so the rule is strict; the baseline is taken around the median, so this barely moves it.`);
+    const d0 = state.baseDay;
+    const smp = cal.sample(d0), c = R[d0];
+    $("base-ex-title").textContent = `Example: ${FULL_DAY[d0]}, the 6 weeks behind it`;
     const ranked = smp.filter((x) => x.adj != null).sort((a, q) => q.adj - a.adj).map((x) => x.week);
     table("base-ex-table", ["Week", "Actual", "Drivers", "Neutral", "Rank", "Rule"], smp.map((x) => {
       const st = x.status;
@@ -1706,32 +1661,6 @@ tr.is-closed td { color: var(--muted); }
     note("base-ex-note", `Threshold ${nf.format(Math.round(c.threshold))}: ${c.nOut} ${c.nOut === 1 ? "value is" : "values are"} above it. Baseline ${nf.format(Math.round(c.level))} = average of the values marked used.`,
       `Neutral = actual ÷ the drivers of that day (season × calendar × weather × price).` +
       (big && Math.abs(big.factor - 1) > 0.03 ? ` Week ${big.week}'s drivers factor is ${nf2.format(big.factor)} (${why}), so its neutral value differs most from the actual one.` : ""));
-    const levels = R.flatMap((day) => day.map((x) => x.level));
-    const lo = Math.min(...levels), hi = Math.max(...levels);
-    const tint = (v) => `color-mix(in oklab, var(--accent) ${Math.round(12 + 88 * (v - lo) / (hi - lo || 1))}%, var(--surface))`;
-    const box = $("heat");
-    box.replaceChildren(el("span"), ...M.HOURS.map((h) => el("span", "h-lab", h % 2 === 0 ? hh(h) : "")));
-    R.forEach((day, d) => {
-      box.append(el("span", "h-row", DAYS[d]));
-      day.forEach((x, i) => {
-        const btn = el("button");
-        btn.type = "button";
-        btn.style.background = tint(x.level);
-        btn.setAttribute("aria-label", `${slot(d, i)}: ${nf.format(Math.round(x.level))} units`);
-        btn.setAttribute("aria-pressed", String(d === d0 && i === i0));
-        btn.addEventListener("click", () => { state.heatCell = [d, i]; renderBaseline(); });
-        box.append(btn);
-      });
-    });
-    const sc = $("heat-scale"), bar = el("i");
-    bar.style.background = `linear-gradient(90deg, ${tint(lo)}, ${tint(hi)})`;
-    sc.replaceChildren(el("span", null, nf.format(Math.round(lo))), bar, el("span", null, nf.format(Math.round(hi))));
-    $("heat-pick").textContent = `Selected: ${slot(d0, i0)}, ${nf.format(Math.round(c.level))} units. Tap a cell to see its 6 weeks above.`;
-    let nOut = 0, n = 0;
-    R.forEach((day) => day.forEach((x) => { n += x.n; nOut += x.nOut; }));
-    note("base-note", `The rule set aside ${nOut} of ${n} values. The neutral week is ${plain100(cal.B26.levelWeek)} units, the sum of these 72 values; a plan week is this × its drivers (${plain100(cal.B26.weeks[43])} in week 43, ${plain100(cal.B26.weeks[50])} in week 50).`,
-      `With only 6 values the middle ranks understate the spread, so the rule is strict; the baseline is taken around the median, so this barely moves it.`);
-    table("heat-table", ["", ...M.HOURS.map((h) => hh(h))], R.map((day, d) => [DAYS[d], ...day.map((x) => nf.format(Math.round(x.level)))]));
   }
 
   /* ---------- charts ---------- */
@@ -1739,7 +1668,7 @@ tr.is-closed td { color: var(--muted); }
     if (!last) return;
     const { res, ready } = last;
     const s = res.summary;
-    const pHost = $("paint-chart"), brHost = $("bridge-chart"), ciHost = $("ci-chart"), cumHost = $("cum-chart"), hHost = $("hours-chart");
+    const pHost = $("paint-chart"), brHost = $("bridge-chart"), ciHost = $("ci-chart"), cumHost = $("cum-chart");
     if (pHost.offsetParent !== null && fresh(pHost)) paintingChart(pHost, paintRows());
     if (brHost.offsetParent !== null && fresh(brHost)) {
       if (!ready) brHost.replaceChildren(el("p", "placeholder", "Enter the redemption rate to see the bridge."));
@@ -1778,27 +1707,16 @@ tr.is-closed td { color: var(--muted); }
         ],
       });
     }
-    if (hHost.offsetParent !== null && fresh(hHost)) {
-      const H = cal.hours25;
-      lineChart(hHost, {
-        weeks: M.HOURS, zero: true, labels: false, xTick: (h) => hh(h), head: (h) => `${hh(h)}:00 to ${hh(h + 1)}:00`,
-        tickFmt: (v) => nf.format(v), valFmt: (v) => nf.format(Math.round(v)),
-        series: [
-          { short: "counterfactual", values: H.base, color: "var(--muted)", dash: true },
-          { short: "actual demand", values: H.actual, color: "var(--accent)" },
-        ],
-      });
-    }
   }
 
   /* ---------- method ---------- */
   function renderMethod() {
     const items = [
       "Goal: show the marketing team, before a coupon is launched, what it means for logistics: the extra units, the volume and the deadline for supply chain, the weekly volume in the distribution centre and the shelf in the stores. Extra (incremental) units are the units the coupon adds, which would not have been sold without it. Customers activate the coupon in the Drugstore app and redeem it at the till; the data are store sales.",
-      "Baseline (the rule, per hour): for each weekday and opening hour, 08:00 to 20:00, the same weekday and hour in the last 6 weeks, as neutral demand (demand ÷ the drivers of the day). Ranked high to low, values above the middle value + 2 × the standard deviation of the middle ranks + 2 are outliers; the baseline is the average of the 3 values around the median of the rest. Closed days and closed hours are left out.",
+      "Baseline (the rule, on daily demand): for each weekday, the same weekday in the last 6 weeks, as neutral demand (demand ÷ the drivers of the day). Ranked high to low, values above the middle value + 2 × the standard deviation of the middle ranks + 2 are outliers; the baseline is the average of the 3 values around the median of the rest. Closed days are left out.",
       `Rolling, then frozen: the window moves with every week (the 6 weeks before that week) and skips weeks of ${B}'s own coupons and the dip after them. During a coupon and its dip it is frozen at the 6 weeks before the coupon, so the coupon cannot leak into its own baseline. With data up to week 42, the 2026 plan uses weeks 37 to 42.`,
-      `Drivers: normal demand of a day = baseline × season × calendar × weather × price. Season: a smooth yearly curve (5 sine/cosine pairs). Calendar: the first and second shopping day before a public holiday and the run-up to Christmas (1 to 24 December). Weather: the daily maximum temperature against its seasonal normal (Karlsruhe). Price: ${B}'s shelf price ÷ the category price index (the volume-weighted average shelf price of men's deo in the Drugstore, weekly), against its usual level. The effects are measured together in one regression on the log of daily demand, on ${cal.trainYears.join(" and ")}, outside ${B}'s own coupons (Drivers card). The weekday and the level are not in the regression: the baseline carries them.`,
-      `Counterfactual: for a day = the sum over its open hours of baseline[weekday, hour] × the drivers of the day. Incremental = actual − counterfactual. The 95% intervals use the day-to-day error of the regression (${pct1(cal.sdIn)}), independent from day to day, and the error of the frozen baseline level (${pct1(cal.sdL)}), one number for the whole coupon and its dip, because the same 6 weeks feed every cell of the frozen baseline; both come from days outside the coupons.`,
+      `Drivers: normal demand of a day = baseline × season × calendar × weather × price. Season: a smooth yearly curve (5 sine/cosine pairs). Calendar: the first and second shopping day before a public holiday, the run-up to Christmas (1 to 24 December) and the short day (24 December, the store closes at 14:00). Weather: the daily maximum temperature against its seasonal normal (Karlsruhe). Price: ${B}'s shelf price ÷ the category price index (the volume-weighted average shelf price of men's deo in the Drugstore, weekly), against its usual level. The effects are measured together in one regression on the log of daily demand, on ${cal.trainYears.join(" and ")}, outside ${B}'s own coupons (Drivers card). The weekday and the level are not in the regression: the baseline carries them.`,
+      `Counterfactual: for a day = baseline[weekday] × the drivers of the day. Incremental = actual − counterfactual. The 95% intervals use the day-to-day error of the regression (${pct1(cal.sdIn)}), independent from day to day, and the error of the frozen baseline level (${pct1(cal.sdL)}), one number for the whole coupon and its dip, because the same 6 weeks feed every weekday of the frozen baseline; both come from days outside the coupons.`,
       `Test: the drivers never saw ${M.YEAR}. On its ${cal.holdout.weeks} weeks with data, the counterfactual missed actual weekly demand by ${pct1(cal.holdout.weeklyRms)} (daily ${pct1(cal.holdout.dailyRms)}), bias ${pctSigned(cal.holdout.weeklyBias)}. Over all years, rolling weeks outside the coupons miss by ${pct1(cal.sdW)}.`,
       `Control brand: ${M.CONTROL} gets the same model (its own drivers, its price against the category index): the cross-check of the control assumption. If the coupon pulled the control's buyers, the control would fall below its own normal in the coupon weeks (2024: ${pctSigned(cal.controlCheck.years[2024].coupon)}, 2025: ${pctSigned(cal.controlCheck.years[2025].coupon)}).`,
       "Plan: redemptions = app users × your redemption rate at full availability (Einlösequote); units with the coupon = redemptions × units per redemption; incremental = that × incremental share; the dip = incremental × pulled-forward share, spread over the three weeks after the coupon like in 2025. Weekly split: the shape of the 2025 coupon, launch week strongest. The coupon runs 2 or 4 whole weeks, Monday to Saturday.",
@@ -1808,8 +1726,8 @@ tr.is-closed td { color: var(--muted); }
       `Volume to commit: the lead time fixes the volume before any redemption is seen. Commit Q = forecast + z × σ, where the expected shortfall σ × G(z) equals (1 − fill rate) × forecast. σ combines the plan baseline's error in last year's coupon weeks (${pct0(cal.baseErr25)}), the redemption-rate uncertainty and the incremental share's interval.`,
       "Shelf: each delivery has to cover the selling days until the next one. Assumption: stores get one delivery a week, on Monday. The check takes the heaviest stretch in the coupon weeks for one high-volume store, measured against a normal week of the plan, and compares it with facings × units per facing.",
       `Start week: a coupon can start in any week of 2026 and has to end by week 52. Weeks 1 to ${M.LAST_DATA} are already in the data, so a coupon there is a what-if on that week's normal demand (the counterfactual, with the drivers as they were); its weekday shares and closed days come from that week.`,
-      `Data: fictional. Hourly sales of ${B} and the control brand from week ${M.WK.order[0][1]} of ${M.WK.order[0][0]} to week ${M.LAST_DATA} of ${M.YEAR}, made from known drivers: a season shaped like the usual Google Trends pattern for "deo" in Germany, +20% and +8% on the two shopping days before a public holiday, +2% per degree above the seasonal normal (real Karlsruhe temperatures), a price elasticity of −2 against a category price index that moves with the control brand's and other brands' promotions, weekly and daily shocks and two coupons (2024 and 2025). Inputs of the model: weekly.csv (sales, fill rates and prices, with the category price index), temperature.csv (Open-Meteo archive), holidays.csv.`,
-      "Test of the measurement: on 200 simulated datasets with the same known drivers and coupons, the measured incremental units were 1 to 8% too high on average (2024: ×1.01, 2025: ×1.08; single runs ranged from ×0.3 to ×1.7 for the smaller coupon), and the 95% intervals held the true value in 87 to 96% of the runs. The dip is hard to measure: on average 55 to 69% of its true size. The drivers came back close to the truth (before a holiday +20.4% and +8.1% against +20% and +8%, weather +2.0% per degree, price elasticity −2.06 against −2.0); their intervals held the true value in 68 to 95% of the runs, too few for weather and price, because the regression treats the days of a week as independent while a week's shock is shared by its six days. The counterfactual of the weeks the drivers never saw missed actual weekly demand by 3.8% on average, with a bias of +0.9%.",
+      `Data: fictional. Daily sales of ${B} and the control brand from week ${M.WK.order[0][1]} of ${M.WK.order[0][0]} to week ${M.LAST_DATA} of ${M.YEAR}, made from known drivers: a season shaped like the usual Google Trends pattern for "deo" in Germany, +20% and +8% on the two shopping days before a public holiday, 24 December with 43.5% of a normal day's demand (the store closes at 14:00), +2% per degree above the seasonal normal (real Karlsruhe temperatures), a price elasticity of −2 against a category price index that moves with the control brand's and other brands' promotions, weekly and daily shocks and two coupons (2024 and 2025). Inputs of the model: weekly.csv (sales, fill rates and prices, with the category price index), temperature.csv (Open-Meteo archive), holidays.csv.`,
+      "Test of the measurement: on 200 simulated datasets with the same known drivers and coupons, the measured incremental units were ×0.99 (2024) and ×1.07 (2025) of the true ones on average (single runs ranged from ×0.1 to ×1.7 for the smaller coupon), and the 95% intervals held the true value in 89 to 97% of the runs. The dip is hard to measure: on average 58 to 70% of its true size. The drivers came back close to the truth (before a holiday +20.5% and +8.1% against +20% and +8%, short day −57.0% against −56.5%, weather +2.0% per degree, price elasticity −2.05 against −2.0); their intervals held the true value in 69 to 95% of the runs, too few for weather and price, because the regression treats the days of a week as independent while a week's shock is shared by its six days. The counterfactual of the weeks the drivers never saw missed actual weekly demand by 3.8% on average, with a bias of +0.8%.",
     ];
     $("method-list").replaceChildren(...items.map((t) => el("li", null, t)));
   }
@@ -1844,7 +1762,7 @@ tr.is-closed td { color: var(--muted); }
 
   let raf = 0;
   const ro = new ResizeObserver(() => { cancelAnimationFrame(raf); raf = requestAnimationFrame(drawCharts); });
-  ["paint-chart", "bridge-chart", "ci-chart", "cum-chart", "hours-chart"].forEach((id) => ro.observe($(id)));
+  ["paint-chart", "bridge-chart", "ci-chart", "cum-chart"].forEach((id) => ro.observe($(id)));
 
   syncControls();
   update();

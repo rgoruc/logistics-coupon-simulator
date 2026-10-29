@@ -11,14 +11,15 @@ Daily demand of each brand is built from drivers the model has to find again:
   over the complete years in simulation/google_trends_deo_de.csv, smoothed), so the summer peak and the rise before
   Christmas look like the real search behaviour. Trends is only used for this shape.
 - pre-holiday lifts: +20% on the first shopping day before a public holiday, +8% on the second (holidays.csv,
-  Baden-Wuerttemberg; stores closed on the holiday; 24 December closes at 14:00)
+  Baden-Wuerttemberg; stores closed on the holiday). 24 December the store closes at 14:00: the day gets 43.5% of a
+  normal weekday's demand (the share a weekday sells before 14:00)
 - weather: +2% per degree the daily maximum (temperature.csv, Karlsruhe, Open-Meteo archive) is above its
   seasonal normal
 - price: each brand's shelf price against the category price index (the volume-weighted average shelf price of men's
   deo in the Drugstore, weekly, in weekly.csv). The index moves with the control brand's -20% promotions and with
   the promotions of other brands. Deo Test Brand: elasticity -2 (the category 5% cheaper: -10%); the control brand:
   -2 against its own relative price (its promotion: about +50%).
-- noise: a weekly market shock shared by both brands, a weekly brand shock, a daily shock and Poisson counts per hour
+- noise: a weekly market shock shared by both brands, a weekly brand shock, a daily shock and Poisson counts per day
 - two Deo Test Brand app coupons (2024 weeks 18-21, 10% off; 2025 weeks 43-47, 20% off), with a dip in the three
   weeks after each. The control brand is not affected by the coupons.
 
@@ -69,9 +70,7 @@ OTHER_PROMO = {2024: {6: 0.95, 15: 0.94, 23: 0.96, 31: 0.93, 36: 0.95, 44: 0.94,
                2026: {3: 0.94, 9: 0.95, 17: 0.96, 31: 0.93, 35: 0.95, 41: 0.96}}
 PRE1, PRE2 = 1.20, 1.08                # first and second shopping day before a public holiday
 DOW = [0.138, 0.129, 0.138, 0.169, 0.206, 0.220, 0.0]
-HOURS = list(range(8, 20))
-HOUR_WD = [4.0, 6.0, 7.5, 8.5, 9.0, 8.5, 8.0, 8.5, 9.5, 10.5, 10.5, 9.5]
-HOUR_SAT = [4.0, 7.0, 9.5, 11.0, 11.5, 11.0, 10.0, 9.0, 8.0, 7.0, 6.5, 5.5]
+SHORT_DAY_SHARE = 0.435  # 24 December (store closes at 14:00): the share of a weekday's demand that falls before 14:00
 FULL_W = [1.30, 1.00, 0.92, 0.98]      # weekly shape of a coupon
 DIPW = [0.52, 0.29, 0.19]             # weekly shape of the dip
 FR_COUPON = {2025: {43: 0.890, 44: 0.935, 45: 0.962, 46: 0.972, 47: 0.970, 48: 0.990, 49: 0.987, 50: 0.984}}
@@ -153,13 +152,6 @@ def season_of_day(season: dict, d: dt.date) -> float:
     return season[w0] * (1 - f) + season[w1] * f
 
 
-def hour_shares(day: dt.date, close_hour: int) -> list:
-    prof = HOUR_SAT if day.weekday() == 5 else HOUR_WD
-    prof = [v if h < close_hour else 0.0 for v, h in zip(prof, HOURS)]
-    t = sum(prof)
-    return [v / t for v in prof]
-
-
 def coupon_spec(mau, rate_full, upr, extra, dip, start, full, partial, last_chance=1.4):
     raw = {start + i: FULL_W[i] for i in range(full)}
     if partial:
@@ -188,10 +180,10 @@ class Inputs:
 
 
 def simulate(seed: int, inp: Inputs) -> dict:
-    """Returns {"weekly": [...], "hourly": [...], "truth": {...}} in the project's CSV formats."""
+    """Returns {"weekly": [...], "daily": [...], "truth": {...}} in the project's CSV formats."""
     # separate random streams, so a run without the coupons differs only in the coupon and dip weeks
     rng_shock, rng_fr = np.random.default_rng([seed, 1]), np.random.default_rng([seed, 2])
-    hourly, fr, sales = {}, {}, {}
+    daily, fr, sales = {}, {}, {}
     keep = [(2024, w) for w in WEEKS] + [(2025, w) for w in WEEKS] + [(2026, w) for w in range(1, 43)]
     for (y, w) in keep:
         market = rng_shock.normal(0, SD_MARKET)
@@ -218,8 +210,7 @@ def simulate(seed: int, inp: Inputs) -> dict:
                 v = (level(b, day) * DOW[d] * season_of_day(inp.season, day) * PRE1 ** n1 * PRE2 ** n2
                      * math.exp(BETA * anom) * price_factor(b, y, w)
                      * math.exp(market + brand_shock + day_shock[d]))
-                close = inp.cal.close_hour(day, HOURS[-1])
-                dem[day] = v * sum(hour_shares(day, HOURS[-1] + 1)[i] for i, h in enumerate(HOURS) if h < close)
+                dem[day] = v * (SHORT_DAY_SHARE if inp.cal.is_short(day) else 1.0)
             amount = c["extra"].get(w, 0.0) + c["dip"].get(w, 0.0) if (c and b == "test") else 0.0
             cdays = [d for d in range(6) if dem[wdays[d]] > 0]
             if amount and c and w == c["partial"]:
@@ -229,12 +220,10 @@ def simulate(seed: int, inp: Inputs) -> dict:
             for d in range(6):
                 day = wdays[d]
                 v = dem[day] + (amount * dem[day] / ctot if amount and d in cdays else 0.0)
-                close = inp.cal.close_hour(day, HOURS[-1])
-                hs = hour_shares(day, close) if dem[day] > 0 else [0.0] * len(HOURS)
                 rng_p = np.random.default_rng([seed, 3, y, w, d, BRANDS.index(b)])
-                vals = [int(rng_p.poisson(max(v, 0) * s * f)) for s in hs]
-                hourly[(b, day)] = vals
-                tot_sales += sum(vals)
+                units = int(rng_p.poisson(max(v, 0) * f)) if dem[day] > 0 else 0
+                daily[(b, day)] = units
+                tot_sales += units
             sales[(y, b, w)] = tot_sales
 
     # distribution centre orders in 2025 (a simple order policy that does not know the coupon)
@@ -258,7 +247,7 @@ def simulate(seed: int, inp: Inputs) -> dict:
         fD = ALPHA_D * so[w] + (1 - ALPHA_D) * fD
         dc[w] = hist[w] = max(0, ceil_to((1 + DELTA_D + TP_D) * fD - (nsD + wip), ORDER_LOT))
 
-    weekly_rows, hourly_rows = [], []
+    weekly_rows, daily_rows = [], []
     for (y, w) in keep:
         weekly_rows.append({"year": y, "week": w, "test_units": sales[(y, "test", w)], "test_fill_rate": fr[(y, "test", w)],
                             "test_price": price("test", y, w), "control_units": sales[(y, "control", w)],
@@ -271,15 +260,14 @@ def simulate(seed: int, inp: Inputs) -> dict:
                 continue
             iy, iw, wd = day.isocalendar()
             for b in BRANDS:
-                for h, v in zip(HOURS, hourly[(b, day)]):
-                    hourly_rows.append([day.isoformat(), iy, iw, wd, h, b, v])
+                daily_rows.append([day.isoformat(), iy, iw, wd, b, daily[(b, day)]])
     truth = {"seed": seed}
     for y in COUPONS:
         truth[f"incremental_{y}"] = round(COUPONS[y]["g"])
         truth[f"dip_{y}"] = round(-sum(COUPONS[y]["dip"].values()))
-    truth.update({"weather_per_degree": BETA, "pre_holiday_1": PRE1, "pre_holiday_2": PRE2,
+    truth.update({"weather_per_degree": BETA, "pre_holiday_1": PRE1, "pre_holiday_2": PRE2, "short_day_share": SHORT_DAY_SHARE,
                   "price_elasticity_test": ETA_TEST, "price_elasticity_control": EPS_CONTROL, "season_by_week": {w: round(v, 4) for w, v in inp.season.items()}})
-    return {"weekly": weekly_rows, "hourly": hourly_rows, "truth": truth}
+    return {"weekly": weekly_rows, "daily": daily_rows, "truth": truth}
 
 
 def write(sim: dict, out: Path, copy_static_from: Path | None = None) -> None:
@@ -288,10 +276,10 @@ def write(sim: dict, out: Path, copy_static_from: Path | None = None) -> None:
         wr = csv.DictWriter(fh, fieldnames=list(sim["weekly"][0].keys()))
         wr.writeheader()
         wr.writerows(sim["weekly"])
-    with open(out / "hourly_sales.csv", "w", newline="", encoding="utf-8") as fh:
+    with open(out / "daily_sales.csv", "w", newline="", encoding="utf-8") as fh:
         wr = csv.writer(fh)
-        wr.writerow(["date", "year", "week", "weekday", "hour", "brand", "units"])
-        wr.writerows(sim["hourly"])
+        wr.writerow(["date", "year", "week", "weekday", "brand", "units"])
+        wr.writerows(sim["daily"])
     (out / "truth.json").write_text(json.dumps(sim["truth"], indent=1), encoding="utf-8")
     if copy_static_from and copy_static_from.resolve() != out.resolve():
         for name in ("own_coupons.csv", "past_coupons.csv", "plan_assumptions.csv", "shelf.csv", "holidays.csv",
@@ -307,7 +295,7 @@ def main() -> None:
     out = Path(args.out) if args.out else HERE / f"output_seed_{args.seed}"
     sim = simulate(args.seed, Inputs())
     write(sim, out, INPUT)
-    print(f"Wrote {out}: {len(sim['weekly'])} weeks, {len(sim['hourly'])} hourly rows. True effects: {sim['truth']}")
+    print(f"Wrote {out}: {len(sim['weekly'])} weeks, {len(sim['daily'])} daily rows. True effects: {sim['truth']}")
 
 
 if __name__ == "__main__":

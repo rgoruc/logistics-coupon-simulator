@@ -26,8 +26,8 @@ from generate_data import Inputs, simulate, write  # noqa: E402
 from model import calibrate, load  # noqa: E402
 from model.baseline import RuleSettings  # noqa: E402
 
-DRIVERS = [("pre1", "pre_holiday_1", True), ("pre2", "pre_holiday_2", True), ("anomaly", "weather_per_degree", False),
-           ("z", "price_elasticity_test", False)]
+DRIVERS = [("pre1", "pre_holiday_1", True), ("pre2", "pre_holiday_2", True), ("short", "short_day_share", True),
+           ("anomaly", "weather_per_degree", False), ("z", "price_elasticity_test", False)]
 
 
 def main() -> None:
@@ -42,7 +42,7 @@ def main() -> None:
             sim = simulate(seed, inp)
             folder = Path(tmp) / str(seed)
             write(sim, folder, ROOT / config.DATA_DIR)
-            cal = calibrate(load(folder, config.OPENING_HOURS), rule, config.REFERENCE_COUPON_YEAR, config.THETA_ITERATIONS)
+            cal = calibrate(load(folder), rule, config.REFERENCE_COUPON_YEAR)
             t = sim["truth"]
             row = {"seed": seed, "holdout_w": cal.holdout["weekly_rms"], "holdout_bias": cal.holdout["weekly_bias"]}
             for y, m in cal.measurements.items():

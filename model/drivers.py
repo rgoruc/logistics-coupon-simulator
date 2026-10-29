@@ -1,10 +1,11 @@
 """The drivers of normal demand, each one a separate factor:
 
-    normal demand of a day = baseline[weekday, hour] x season x calendar x weather x price
+    normal demand of a day = baseline[weekday] x season x calendar x weather x price
 
 - season:   a smooth curve over the year (5 sine/cosine pairs), the same every year
-- calendar: the first and second shopping day before a public holiday, and the run-up to Christmas
-            (1 to 24 December, rising to its full effect on 23 December)
+- calendar: the first and second shopping day before a public holiday, the run-up to Christmas
+            (1 to 24 December, rising to its full effect on 23 December), and the short day: 24 December,
+            when the store closes at 14:00
 - weather:  the day's maximum temperature against the seasonal normal (degrees above or below)
 - price:    the brand's shelf price against the category price index (the volume-weighted average shelf price of
             men's deo in the Drugstore, weekly), relative to its usual level
@@ -26,6 +27,7 @@ from .mathutil import NAN, mean, total
 SEASON_HARMONICS = 5   # sine/cosine pairs of the season curve
 TEMP_HARMONICS = 2     # sine/cosine pairs of the temperature normal
 XMAS_FROM, XMAS_TO = 1, 24  # the Christmas run-up: December 1 to 24, rising to its full effect on December 23
+STORE_CLOSE = 20            # the store's usual closing hour (20:00)
 
 
 def year_fraction(d: dt.date) -> float:
@@ -153,11 +155,15 @@ class Calendar:
     def is_open(self, d: dt.date) -> bool:
         return d.weekday() != 6 and d not in self.closed
 
-    def close_hour(self, d: dt.date, last_hour: int) -> int:
-        """First hour the store is closed: the usual closing hour, earlier on a short day, 0 when closed."""
+    def is_short(self, d: dt.date) -> bool:
+        """A short day: the store is open but closes early (24 December, 14:00)."""
+        return self.is_open(d) and d in self.short
+
+    def close_hour(self, d: dt.date) -> int:
+        """The closing hour: 20 on a normal day, earlier on a short day, 0 when closed."""
         if not self.is_open(d):
             return 0
-        return self.short.get(d, last_hour + 1)
+        return self.short.get(d, STORE_CLOSE)
 
     def pre_holiday(self, d: dt.date) -> tuple:
         """How many closed holidays (Monday to Saturday) have this day as their first or second shopping day before."""
@@ -220,12 +226,13 @@ class DayFeatures:
     date: dt.date
     weekday: int          # 0 = Monday
     open: bool
-    close_hour: int       # first closed hour (0 when closed all day)
+    close_hour: int       # closing hour: 20, 14 on a short day, 0 when closed all day
     frac: float
     season: list          # fourier terms
     pre1: float
     pre2: float
     xmas: float
+    short: float          # 1 on a short day (the store closes early), else 0
     anomaly: float | None  # None after the temperature data
     z: float              # Deo Test Brand: log(price / category price index) against its norm
     zc: float             # the control brand: the same with its own price
@@ -250,8 +257,8 @@ def build_features(data, cal: Calendar, weather: Weather, first: dt.date, last: 
         z = math.log(data.price(iy, "test", iw) / data.price(iy, "category", iw)) - zn if has else 0.0
         zc = math.log(data.price(iy, "control", iw) / data.price(iy, "category", iw)) - znc if has else 0.0
         n1, n2 = cal.pre_holiday(d)
-        out[d] = DayFeatures(d, wd - 1, cal.is_open(d), cal.close_hour(d, data.hours[-1]), year_fraction(d),
+        out[d] = DayFeatures(d, wd - 1, cal.is_open(d), cal.close_hour(d), year_fraction(d),
                              fourier(year_fraction(d), SEASON_HARMONICS), float(n1), float(n2), christmas_ramp(d),
-                             weather.anomaly(d), z, zc, (d - first).days / 365.25)
+                             1.0 if cal.is_short(d) else 0.0, weather.anomaly(d), z, zc, (d - first).days / 365.25)
         d += dt.timedelta(days=1)
     return out

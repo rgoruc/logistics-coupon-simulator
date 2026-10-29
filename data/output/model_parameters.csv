@@ -1,32 +1,32 @@
 parameter,value,note
 drivers_fitted_on,2024 2025,Years of the drivers regression (the plan year is the test)
-drivers_fit_days,513,Days in the regression of Deo Test Brand
-sd_in_sample,0.03680726752396152,Daily error (log) of the drivers regression
-sd_daily_out_of_sample,0.03961126039093923,Daily error (log) of the counterfactual on rolling days outside the coupons
-sd_level,0.014638203686870825,Error of the frozen baseline level (one number for the whole coupon and its dip)
-sd_weekly_out_of_sample,0.030238110020272574,Weekly error (log) of the counterfactual outside the coupons
+drivers_fit_days,515,Days in the regression of Deo Test Brand
+sd_in_sample,0.03799431120994659,Daily error (log) of the drivers regression
+sd_daily_out_of_sample,0.04084705666846456,Daily error (log) of the counterfactual on rolling days outside the coupons
+sd_level,0.014997144866889895,Error of the frozen baseline level (one number for the whole coupon and its dip)
+sd_weekly_out_of_sample,0.029589516651344152,Weekly error (log) of the counterfactual outside the coupons
 out_of_sample_days,724,Days in the out-of-sample error
 holdout_year,2026,The plan year's weeks with data: the drivers never saw them
 holdout_weeks,42,Weeks in the holdout (outside the plan year's coupon)
-holdout_weekly_rms,0.028583468754551422,Weekly error (log) in the holdout
-holdout_weekly_bias,0.0057130834085657185,Average of actual / counterfactual - 1 in the holdout
-holdout_daily_rms,0.03729200964766252,Daily error (log) in the holdout
-control_check_weekly_corr,0.5306616963019051,Correlation of the weekly errors of the two brands outside the coupons
-control_check_2024_coupon,0.00041026958102838204,Control brand vs its own counterfactual in the 2024 coupon weeks (0 = no sign of cannibalisation)
-control_check_2025_coupon,-0.004332825723912312,Control brand vs its own counterfactual in the 2025 coupon weeks (0 = no sign of cannibalisation)
+holdout_weekly_rms,0.027074963522338406,Weekly error (log) in the holdout
+holdout_weekly_bias,0.005082416120304409,Average of actual / counterfactual - 1 in the holdout
+holdout_daily_rms,0.03751530203789659,Daily error (log) in the holdout
+control_check_weekly_corr,0.4861243704314698,Correlation of the weekly errors of the two brands outside the coupons
+control_check_2024_coupon,-0.0023501382701868853,Control brand vs its own counterfactual in the 2024 coupon weeks (0 = no sign of cannibalisation)
+control_check_2025_coupon,-0.011959352395285219,Control brand vs its own counterfactual in the 2025 coupon weeks (0 = no sign of cannibalisation)
 plan_window,2026: 37 38 39 40 41 42,Frozen baseline window of the plan
-plan_neutral_week,27759.47702853587,Weekly sum of the plan's neutral baseline (rule output)
-plan_typical_week,25060.78203515779,Average normal demand of the plan weeks (the shelf check's normal week)
-plan_weeks_normal_demand,43:23843 44:24014 45:24587 46:25439 47:26390 48:27224 49:27884 50:28302 51:28215 52:14711,Normal demand of each plan week at normal weather
+plan_neutral_week,27527.15387034776,Weekly sum of the plan's neutral baseline (rule output)
+plan_typical_week,24880.352683002406,Average normal demand of the plan weeks (the shelf check's normal week)
+plan_weeks_normal_demand,43:23698 44:23886 45:24465 46:25304 47:26217 48:26990 49:27612 50:28050 51:28004 52:14578,Normal demand of each plan week at normal weather
 weather_scenario_degrees,3.092555315079451,Cold / warm scenario: one standard deviation of the weekly temperature anomaly
-plan_error_last_year_rms,0.05090468101042818,The same plan made one year earlier vs the counterfactual in the coupon weeks (what the plan cannot know)
+plan_error_last_year_rms,0.05164648395004382,The same plan made one year earlier vs the counterfactual in the coupon weeks (what the plan cannot know)
 fill_rate_normal_weeks,0.9803119999999995,Average fill rate outside the coupons
 units_per_redemption_past,1.75,Average of past coupons
-dip_share_past,0.2770194023348078,Average pulled-forward share of past coupons
-incremental_share_rel_se,0.07917688332125321,Relative standard error of the measured incremental share
-rate_line_slope,0.5404473654205841,Redemption rate at full availability = intercept + slope x discount
-rate_line_intercept,0.011407747713626654,
-share_line_slope,0.3781775716843726,Incremental share = intercept + slope x discount
-share_line_intercept,0.3871789883497376,
-weekly_shape_full_weeks,0.3151 0.1781 0.2146 0.2082,Share of the reference coupon's incremental units per full week
-dip_weights,0.6497 0.4328 -0.0825,How the dip spreads over the weeks after the coupon
+dip_share_past,0.190492548198113,Average pulled-forward share of past coupons
+incremental_share_rel_se,0.08125187134515559,Relative standard error of the measured incremental share
+rate_line_slope,0.5411757936652744,Redemption rate at full availability = intercept + slope x discount
+rate_line_intercept,0.011341431042443673,
+share_line_slope,0.011279302353373597,Incremental share = intercept + slope x discount
+share_line_intercept,0.46100127278529446,
+weekly_shape_full_weeks,0.3242 0.1748 0.2154 0.2054,Share of the reference coupon's incremental units per full week
+dip_weights,0.6278 0.5068 -0.1346,How the dip spreads over the weeks after the coupon

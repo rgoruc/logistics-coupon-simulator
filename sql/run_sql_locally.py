@@ -32,9 +32,8 @@ STEPS = ["02_parameters.sql", "03_demand.sql", "04_windows.sql", "05_baseline_ru
          "06_control_baseline.sql", "07_test_brand_baseline.sql", "08_counterfactual.sql"]
 
 TABLES = {
-    "hourly_sales": ("hourly_sales.csv", [("sales_date", "TEXT", "date"), ("year", "INT", None), ("week", "INT", None),
-                                          ("weekday", "INT", None), ("hour", "INT", None), ("brand", "TEXT", None),
-                                          ("units", "INT", None)]),
+    "daily_sales": ("daily_sales.csv", [("sales_date", "TEXT", "date"), ("year", "INT", None), ("week", "INT", None),
+                                        ("weekday", "INT", None), ("brand", "TEXT", None), ("units", "INT", None)]),
     "weekly": ("weekly.csv", [("year", "INT", None), ("week", "INT", None), ("test_units", "INT", None),
                               ("test_fill_rate", "REAL", None), ("test_price", "REAL", None), ("control_units", "INT", None),
                               ("control_fill_rate", "REAL", None), ("control_price", "REAL", None), ("category_price", "REAL", None),
@@ -50,7 +49,7 @@ DAY_FACTORS = [("sales_date", "TEXT", "date"), ("year", "INT", None), ("week", "
                ("price_factor", "REAL", None),
                ("drivers_factor", "REAL", None), ("plan_factor", "REAL", None), ("control_drivers_factor", "REAL", None),
                ("temperature_anomaly", "REAL", None), ("relative_price_test", "REAL", None), ("pre_holiday_1", "INT", None),
-               ("pre_holiday_2", "INT", None), ("christmas_ramp", "REAL", None)]
+               ("pre_holiday_2", "INT", None), ("christmas_ramp", "REAL", None), ("short_day", "INT", None)]
 
 
 def _cast(v, typ):
@@ -86,7 +85,7 @@ def rel(a, b):
 
 
 def main() -> int:
-    data = load(ROOT / config.DATA_DIR, config.OPENING_HOURS)
+    data = load(ROOT / config.DATA_DIR)
     rule = RuleSettings.from_config(config)
     cal = calibrate(data, rule, config.REFERENCE_COUPON_YEAR)
 
@@ -151,20 +150,19 @@ def main() -> int:
     lpw = data.plan_weeks()[-1]
     print(f"Plan week {lpw} (neutral baseline x season x calendar): SQL {sql_plan[lpw][2]:,.1f}   Python {cal.plan.weeks[lpw]:,.1f}")
     py, pw = data.plan_year(), data.plan_weeks()[0]
-    for d, h, lvl in con.execute("SELECT weekday, hour, baseline_level FROM test_baseline_cells WHERE target_year = ? AND target_week = ?", (py, pw)):
-        worst, n = max(worst, rel(lvl, cal.plan_window.L.cells[d - 1][data.hours.index(h)].level)), n + 1
-    statuses = {(d, h, pos): s for d, h, pos, s in con.execute(
-        "SELECT weekday, hour, src_pos, status FROM test_rule_values WHERE target_year = ? AND target_week = ?", (py, pw))}
+    for d, lvl in con.execute("SELECT weekday, l_day FROM test_baseline_day WHERE target_year = ? AND target_week = ?", (py, pw)):
+        worst, n = max(worst, rel(lvl, cal.plan_window.L.cells[d - 1].level)), n + 1
+    statuses = {(d, pos): s for d, pos, s in con.execute(
+        "SELECT weekday, src_pos, status FROM test_rule_values WHERE target_year = ? AND target_week = ?", (py, pw))}
     from model.counterfactual import positions
     _, pos = positions(data)
     bad = 0
     for d in range(6):
-        for i, h in enumerate(data.hours):
-            for x in cal.sample(d, i):
-                k = (d + 1, h, pos[(x["year"], x["week"])] + 1)
-                if x["status"] in ("used", "outlier", "not used"):
-                    n += 1
-                    bad += statuses.get(k) != x["status"]
+        for x in cal.sample(d):
+            k = (d + 1, pos[(x["year"], x["week"])] + 1)
+            if x["status"] in ("used", "outlier", "not used"):
+                n += 1
+                bad += statuses.get(k) != x["status"]
     print(f"Compared {n} values. Largest relative difference: {worst:.1e} (season and calendar of the plan weeks, "
           f"from the rounded CSV columns: {display:.1e}). Rule verdicts that differ: {bad}.")
     con.close()

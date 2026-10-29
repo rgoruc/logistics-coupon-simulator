@@ -8,7 +8,7 @@ they are in data/input/plan_assumptions.csv, and the Streamlit app has sliders f
 DATA_DIR = "data/input"
 OUTPUT_DIR = "data/output"
 
-# ---- Baseline rule (your SQL logic, applied per weekday and opening hour) ----
+# ---- Baseline rule (applied per weekday, on daily demand) ----
 # How many weeks the baseline looks back. The window skips weeks of Deo Test Brand's own coupons
 # and the dip after them, and is frozen during a coupon at the weeks before it.
 BASELINE_WEEKS = 6
@@ -31,6 +31,3 @@ LARGE_N = 20
 # fitted on the years before the plan year.
 REFERENCE_COUPON_YEAR = 2025
 THETA_ITERATIONS = 5  # not used by the drivers model; kept so older scripts still run
-
-# Store opening hours in the data: 08:00 to 20:00 means hours 8 to 19
-OPENING_HOURS = list(range(8, 20))

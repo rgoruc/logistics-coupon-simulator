@@ -12,10 +12,10 @@ from .data import Data, NAME, CONTROL, DAYS, iso_monday, day_key
 from .counterfactual import window_for, fit_drivers, Counterfactuals, Drivers
 from .drivers import Calendar, Weather, DRIVER_NAMES
 from .calibrate import Calibration, calibrate
-from .plan import (Scenario, default_scenario, reference_rate, share_for, coupon_plan, forecast, daily, hourly, max_full_weeks,
-                   COUPON_LENGTHS, LAST_WEEK, length_share, start_weeks, normal_demand, day_shares, hour_shares, weather_factor, day_drivers)
+from .plan import (Scenario, default_scenario, reference_rate, share_for, coupon_plan, forecast, daily, max_full_weeks,
+                   COUPON_LENGTHS, LAST_WEEK, length_share, start_weeks, normal_demand, day_shares, weather_factor, day_drivers)
 from .supply import deadline, intervals, span_label, shelf_check
 
 
-def load(folder="data/input", hours=None) -> Data:
-    return Data.load(folder, hours)
+def load(folder="data/input") -> Data:
+    return Data.load(folder)
