@@ -339,7 +339,7 @@ with tab_f:
                       f"{m_py.coupon.post[0]} to {m_py.coupon.post[-1]} (buyers who had stocked up)" if m_py else "")
                    + ("" if m_py else f"; {py} had no coupon so far, so this gap is the model's error") + ". Past coupons are measured in the Last coupon tab.")
     st.caption(
-        f"Normal demand without a coupon for every week of {py}: weeks 1 to {lw} from the data (your rolling baseline of the "
+        f"Normal demand without a coupon for every week of {py}: weeks 1 to {lw} from the data (the rolling baseline of the "
         f"{cal.rule.window_weeks} weeks before each week × the drivers of each day as they were: season, calendar, weather and "
         f"price), from week {lw + 1} the plan (the baseline frozen at {weeks_text(cal.plan.window)}, "
         f"{h100(cal.plan.level_week)} a week on a neutral day, × the season × {py}'s holiday calendar × {weather.lower()} weather: "
