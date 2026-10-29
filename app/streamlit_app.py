@@ -223,6 +223,8 @@ ASSUMPTIONS = [
     ]),
     ("Coupon", [
         f"Runs 2 or 4 weeks, Monday to Saturday. It can start in any week of {py} and has to end by week 52.",
+        "Past coupons in the data: " + and_list([f"{c.year} weeks {c.weeks[0]} to {c.weeks[-1]} ({c.discount:.0%} off)" for c in data.own])
+        + ". Both are measured against normal demand (Last coupon tab).",
         f"Monthly active male app users: {mau:,}.",
         "Redemption rate (Einlösequote) at full availability: user's estimate or the reference line through the past coupons.",
         f"A 2-week coupon gets {length_share(cal, 2):.0%} of a 4-week coupon's redemptions: the share of the first two weeks in {ry}.",
@@ -243,7 +245,7 @@ ASSUMPTIONS = [
         f"price (against the category price index). The effects are measured on {and_list([str(y) for y in cal.train_years])} and tested on "
         f"{py} (Drivers section in the Forecast tab).",
         f"Weeks 1 to {lw}: the drivers as they were (the counterfactual). Weeks {lw + 1} to 52: baseline of {weeks_text(cal.plan.window)} "
-        f"× the season × {py}'s holiday calendar × the weather scenario ({weather.lower()}); prices at their usual level.",
+        f"× the season × {py}'s holiday calendar × normal weather; prices at their usual level.",
         "Demand = sales ÷ fill rate.",
     ]),
     ("Supply chain", [
