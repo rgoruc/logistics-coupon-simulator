@@ -187,9 +187,7 @@ ready = mau > 0 and rate > 0
 
 # ---------------- header and KPIs ----------------
 st.title("Logistics Coupon Simulator")
-st.markdown("For the marketing team: what a coupon means for logistics before you launch it. How many extra units the stores "
-            "will sell, how much volume supply chain has to commit and by when, how many pallets the distribution centre "
-            "handles each week and whether the shelves hold the peak. Based on what last year's coupon really added.")
+st.markdown("For the marketing team: what a coupon means for logistics before you launch it.")
 # ---------------- assumptions (values you can change in the sidebar show the current setting) ----------------
 first_wk, last_wk = data.order[0], data.order[-1]
 ctrl_promo = min(data.price(y, "control", w) for (y, w) in data.order)
@@ -263,7 +261,9 @@ pal_base, pal_with = sum(pallets(r["baseline"], sc.pallet_units) for r in cw), s
 k1, k2, k3, k4 = st.columns(4)
 k1.metric(f"Without the coupon, weeks {min(s['weeks'])} to {max(s['weeks'])}", h100(s["couponBaseline"]))
 k1.caption(f"units of normal demand · {pal_base} pallets")
-k2.metric("With the coupon", h100(s["couponDemand"]))
+# shown rounded to 100: "with" = rounded "without" + rounded extra, so the three tiles add up
+with_disp = js_round(s["couponBaseline"] / 100) * 100 + js_round(s["incremental"] / 100) * 100
+k2.metric("With the coupon", h100(with_disp))
 k2.caption(f"{h100(s['redemptions'])} redemptions · {h100(s['couponUnits'])} units sold with it")
 k3.metric("Extra units from the coupon", s100(s["incremental"]))
 k3.caption(f"{pal_with - pal_base:+d} pallets · {s100(s['net'])} net after the dip")
@@ -281,7 +281,7 @@ if ready:
                   "in the coupon weeks" + ((f", or an extra {sug['day']} delivery, "
                                             + ("which is enough." if sug["fitsAll"] else "which is not enough on its own.")) if sug else "."))
     st.markdown(
-        f"**Sales:** {h100(s['couponDemand'])} units in the coupon weeks instead of {h100(s['couponBaseline'])}: **{h100(s['incremental'])} extra**; "
+        f"**Sales:** {h100(with_disp)} units in the coupon weeks instead of {h100(s['couponBaseline'])}: **{h100(s['incremental'])} extra**; "
         f"of the {h100(s['couponUnits'])} units sold with the coupon the rest would have been bought anyway. After the dip in the three weeks "
         f"that follow: **{h100(s['net'])} extra units net**."
         + (f" About {h100(s['dipOutside'])} units of the dip fall after week 52." if s["dipOutside"] > 0 else "")

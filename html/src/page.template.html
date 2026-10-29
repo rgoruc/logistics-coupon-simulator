@@ -364,7 +364,7 @@ tr.is-closed td { color: var(--muted); }
   <header class="head">
     <p class="eyebrow">Drugstore app coupon · Deo Test Brand · fictional sales data</p>
     <h1>Logistics Coupon Simulator</h1>
-    <p class="lede">What a coupon means for logistics before you launch it: the extra units, the volume to commit and by when, the pallets per week and the shelf. Measured on what past coupons really added, against normal demand built from its drivers (season, holidays, weather, prices). Fictional data, one region with 450 stores.</p>
+    <p class="lede">For the marketing team: what a coupon means for logistics before you launch it.</p>
   </header>
 
   <div class="results" aria-label="Results">
@@ -1325,9 +1325,11 @@ tr.is-closed td { color: var(--muted); }
     if (ready) {
       const cw = res.rows.filter((r) => r.coupon);
       const palBase = cw.reduce((a, r) => a + M.pallets(r.baseline), 0), palWith = cw.reduce((a, r) => a + M.pallets(r.demand), 0);
+      // shown rounded to 100: "with" = rounded "without" + rounded extra, so the three tiles add up
+      const withDisp = r100(s.couponBaseline) + r100(s.incremental);
       kpiTiles($("kpis"), [
         { label: `Without the coupon, weeks ${Math.min(...s.weeks)} to ${Math.max(...s.weeks)}`, value: plain100(s.couponBaseline), sub: `units of normal demand · ${palBase} pallets` },
-        { label: "With the coupon", value: plain100(s.couponDemand), sub: `${plain100(s.redemptions)} redemptions · ${plain100(s.couponUnits)} units sold with it` },
+        { label: "With the coupon", value: plain100(withDisp), sub: `${plain100(s.redemptions)} redemptions · ${plain100(s.couponUnits)} units sold with it` },
         { label: "Extra units from the coupon", value: hundreds(s.incremental), sub: `${signed(palWith - palBase)} pallets · ${hundreds(s.net)} net after the dip`, net: true },
         { label: `Commit by ${fmtDate(due)}`, value: plain100(C.q), sub: `units for a ${state.fill}% fill rate · ${Math.abs(C.buffer) < 50 ? "no buffer needed" : hundreds(C.buffer) + " buffer on the forecast"}` },
       ]);
@@ -1343,7 +1345,7 @@ tr.is-closed td { color: var(--muted); }
       const short = shelfRes.items.filter((x) => x.needed > x.facings);
       const sug = shelfRes.suggestion;
       $("takeaway").replaceChildren(
-        line("Sales", `${plain100(s.couponDemand)} units in the coupon weeks instead of ${plain100(s.couponBaseline)}: `, el("strong", null, `${plain100(s.incremental)} extra`),
+        line("Sales", `${plain100(withDisp)} units in the coupon weeks instead of ${plain100(s.couponBaseline)}: `, el("strong", null, `${plain100(s.incremental)} extra`),
           `; of the ${plain100(s.couponUnits)} units sold with the coupon the rest would have been bought anyway. After the dip in the three weeks that follow: `, el("strong", null, `${plain100(s.net)} extra units net`), "." +
           (s.dipOutside > 0 ? ` About ${plain100(s.dipOutside)} units of the dip fall after week 52.` : "")),
         line("Logistics", whatIf ? "Supply chain would have had to commit " : "Supply chain has to commit ", el("strong", null, `${plain100(C.q)} units`), ` for the coupon weeks by `, el("strong", null, fmtDate(due)),
