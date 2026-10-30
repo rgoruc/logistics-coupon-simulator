@@ -1,0 +1,49 @@
+name: Keep the Streamlit app awake
+
+# Streamlit Community Cloud puts an app to sleep after 12 hours without visitors.
+# Every 6 hours this opens the app in a headless browser, like a visitor, and wakes it up if it is asleep.
+on:
+  schedule:
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+
+jobs:
+  visit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install a headless browser
+        run: |
+          pip install playwright==1.47.0
+          python -m playwright install --with-deps chromium
+      - name: Visit the app
+        run: |
+          python - <<'PY'
+          import sys
+          from playwright.sync_api import sync_playwright
+
+          URL = "https://logistics-coupon-simulator.streamlit.app/"
+          with sync_playwright() as p:
+              browser = p.chromium.launch()
+              page = browser.new_page()
+              page.goto(URL, wait_until="domcontentloaded", timeout=90_000)
+              page.wait_for_timeout(10_000)
+              wake = page.get_by_role("button", name="Yes, get this app back up!")
+              if wake.count():
+                  print("The app was asleep: waking it up.")
+                  wake.first.click()
+              else:
+                  print("The app was awake.")
+              # the app itself runs in an iframe; wait until its title is there
+              try:
+                  page.frame_locator("iframe").first.get_by_text("Logistics Coupon Simulator").first.wait_for(timeout=180_000)
+                  print("The app is up.")
+              except Exception as e:
+                  print(f"The app did not show its title: {e}")
+                  sys.exit(1)
+              finally:
+                  browser.close()
+          PY
